@@ -1,0 +1,287 @@
+export namespace types {
+	
+	export class BasicResponse {
+	    success: boolean;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BasicResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	    }
+	}
+	export class CompleteFocusSessionRequest {
+	    session_id: number;
+	    break_time: number;
+	    mark_as_completed: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CompleteFocusSessionRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.session_id = source["session_id"];
+	        this.break_time = source["break_time"];
+	        this.mark_as_completed = source["mark_as_completed"];
+	    }
+	}
+	export class CreateTodoRequest {
+	    name: string;
+	    mode: string;
+	    estimatedPomodoros?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateTodoRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.mode = source["mode"];
+	        this.estimatedPomodoros = source["estimatedPomodoros"];
+	    }
+	}
+	export class CustomSettings {
+	    workTime: number;
+	    shortBreakTime: number;
+	    longBreakTime: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new CustomSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.workTime = source["workTime"];
+	        this.shortBreakTime = source["shortBreakTime"];
+	        this.longBreakTime = source["longBreakTime"];
+	    }
+	}
+	export class TodoItem {
+	    todo_id: number;
+	    name: string;
+	    mode: number;
+	    status: string;
+	    created_at: string;
+	    updated_at: string;
+	    estimatedPomodoros: number;
+	    customSettings?: CustomSettings;
+	
+	    static createFrom(source: any = {}) {
+	        return new TodoItem(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.todo_id = source["todo_id"];
+	        this.name = source["name"];
+	        this.mode = source["mode"];
+	        this.status = source["status"];
+	        this.created_at = source["created_at"];
+	        this.updated_at = source["updated_at"];
+	        this.estimatedPomodoros = source["estimatedPomodoros"];
+	        this.customSettings = this.convertValues(source["customSettings"], CustomSettings);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CreateTodoResponse {
+	    success: boolean;
+	    message: string;
+	    todo: TodoItem;
+	
+	    static createFrom(source: any = {}) {
+	        return new CreateTodoResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.todo = this.convertValues(source["todo"], TodoItem);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class GetStatsRequest {
+	    start_date: string;
+	    end_date: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new GetStatsRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.start_date = source["start_date"];
+	        this.end_date = source["end_date"];
+	    }
+	}
+	export class StartFocusSessionRequest {
+	    todo_id: number;
+	    mode: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StartFocusSessionRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.todo_id = source["todo_id"];
+	        this.mode = source["mode"];
+	    }
+	}
+	export class StartFocusSessionResponse {
+	    success: boolean;
+	    message: string;
+	    session_id: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StartFocusSessionResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.success = source["success"];
+	        this.message = source["message"];
+	        this.session_id = source["session_id"];
+	    }
+	}
+	export class StatResponse {
+	    date: string;
+	    pomodoro_count: number;
+	    custom_count: number;
+	    total_focus_sessions: number;
+	    total_focus_minutes: number;
+	    total_break_minutes: number;
+	    tomato_harvests: number;
+	    time_ranges: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StatResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.pomodoro_count = source["pomodoro_count"];
+	        this.custom_count = source["custom_count"];
+	        this.total_focus_sessions = source["total_focus_sessions"];
+	        this.total_focus_minutes = source["total_focus_minutes"];
+	        this.total_break_minutes = source["total_break_minutes"];
+	        this.tomato_harvests = source["tomato_harvests"];
+	        this.time_ranges = source["time_ranges"];
+	    }
+	}
+	export class StatSummary {
+	    total_pomodoro_count: number;
+	    total_focus_minutes: number;
+	    total_focus_hours: number;
+	    streak_days: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StatSummary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total_pomodoro_count = source["total_pomodoro_count"];
+	        this.total_focus_minutes = source["total_focus_minutes"];
+	        this.total_focus_hours = source["total_focus_hours"];
+	        this.streak_days = source["streak_days"];
+	    }
+	}
+	
+	export class UpdateTodoRequest {
+	    todo_id: number;
+	    name: string;
+	    mode: string;
+	    estimatedPomodoros?: number;
+	    customSettings?: CustomSettings;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateTodoRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.todo_id = source["todo_id"];
+	        this.name = source["name"];
+	        this.mode = source["mode"];
+	        this.estimatedPomodoros = source["estimatedPomodoros"];
+	        this.customSettings = this.convertValues(source["customSettings"], CustomSettings);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class UpdateTodoStatusRequest {
+	    todo_id: number;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new UpdateTodoStatusRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.todo_id = source["todo_id"];
+	        this.status = source["status"];
+	    }
+	}
+
+}
+

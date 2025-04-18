@@ -1,0 +1,201 @@
+package models
+
+import (
+	"database/sql"
+	"fmt"
+	"log"
+	"time"
+)
+
+// Todo 表示待办事项
+type Todo struct {
+	ID                 int64     `json:"id"`
+	Name               string    `json:"name"`
+	Mode               int       `json:"mode"` // 1: pomodoro, 2: custom
+	Status             string    `json:"status"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	EstimatedPomodoros int       `json:"estimated_pomodoros"`
+	CustomSettings     string    `json:"custom_settings"` // JSON字符串，存储自定义设置
+}
+
+// TodoRepository 提供对Todo表的操作
+type TodoRepository struct{}
+
+// NewTodoRepository 创建一个新的TodoRepository
+func NewTodoRepository() *TodoRepository {
+	return &TodoRepository{}
+}
+
+// GetAll 获取所有待办事项
+func (r *TodoRepository) GetAll() ([]*Todo, error) {
+	rows, err := DB.Query(`
+		SELECT todo_id, name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings
+		FROM todos
+		ORDER BY updated_at DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var todos []*Todo
+	for rows.Next() {
+		var todo Todo
+		var createdAt, updatedAt string
+		var customSettings sql.NullString // 使用sql.NullString处理可能为NULL的字段
+
+		err := rows.Scan(
+			&todo.ID,
+			&todo.Name,
+			&todo.Mode,
+			&todo.Status,
+			&createdAt,
+			&updatedAt,
+			&todo.EstimatedPomodoros,
+			&customSettings,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// 处理可能的日期解析错误
+		todo.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+		if err != nil {
+			log.Printf("警告: 解析创建时间出错: %v, 原始值: %s", err, createdAt)
+			todo.CreatedAt = time.Now() // 使用当前时间作为后备
+		}
+
+		todo.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
+		if err != nil {
+			log.Printf("警告: 解析更新时间出错: %v, 原始值: %s", err, updatedAt)
+			todo.UpdatedAt = time.Now() // 使用当前时间作为后备
+		}
+
+		// 处理可能为NULL的customSettings
+		if customSettings.Valid {
+			todo.CustomSettings = customSettings.String
+		} else {
+			todo.CustomSettings = ""
+		}
+
+		todos = append(todos, &todo)
+	}
+
+	// 检查迭代过程中是否有错误
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return todos, nil
+}
+
+// Create 创建新的待办事项
+func (r *TodoRepository) Create(todo *Todo) error {
+	now := time.Now()
+	todo.CreatedAt = now
+	todo.UpdatedAt = now
+
+	result, err := DB.Exec(`
+		INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, todo.Name, todo.Mode, todo.Status, now.Format(time.RFC3339), now.Format(time.RFC3339),
+		todo.EstimatedPomodoros, todo.CustomSettings)
+
+	if err != nil {
+		return err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return err
+	}
+
+	todo.ID = id
+	return nil
+}
+
+// Update 更新已存在的待办事项
+func (r *TodoRepository) Update(todo *Todo) error {
+	// 更新更新时间
+	todo.UpdatedAt = time.Now()
+
+	_, err := DB.Exec(`
+		UPDATE todos
+		SET name = ?, mode = ?, status = ?, updated_at = ?, estimated_pomodoros = ?, custom_settings = ?
+		WHERE todo_id = ?
+	`, todo.Name, todo.Mode, todo.Status, todo.UpdatedAt.Format(time.RFC3339),
+		todo.EstimatedPomodoros, todo.CustomSettings, todo.ID)
+
+	if err != nil {
+		return fmt.Errorf("更新待办事项失败: %w", err)
+	}
+
+	return nil
+}
+
+// UpdateStatus 更新待办事项状态
+func (r *TodoRepository) UpdateStatus(id int64, status string) error {
+	now := time.Now()
+	_, err := DB.Exec(`
+		UPDATE todos
+		SET status = ?, updated_at = ?
+		WHERE todo_id = ?
+	`, status, now.Format(time.RFC3339), id)
+
+	return err
+}
+
+// Delete 删除待办事项
+func (r *TodoRepository) Delete(id int64) error {
+	_, err := DB.Exec(`DELETE FROM todos WHERE todo_id = ?`, id)
+	return err
+}
+
+// GetByID 根据ID获取待办事项
+func (r *TodoRepository) GetByID(id int64) (*Todo, error) {
+	var todo Todo
+	var createdAt, updatedAt string
+	var customSettings sql.NullString // 使用sql.NullString处理可能为NULL的字段
+
+	err := DB.QueryRow(`
+		SELECT todo_id, name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings
+		FROM todos
+		WHERE todo_id = ?
+	`, id).Scan(
+		&todo.ID,
+		&todo.Name,
+		&todo.Mode,
+		&todo.Status,
+		&createdAt,
+		&updatedAt,
+		&todo.EstimatedPomodoros,
+		&customSettings,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	// 解析时间
+	todo.CreatedAt, err = time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		log.Printf("警告: 解析创建时间出错: %v, 原始值: %s", err, createdAt)
+		todo.CreatedAt = time.Now() // 使用当前时间作为后备
+	}
+
+	todo.UpdatedAt, err = time.Parse(time.RFC3339, updatedAt)
+	if err != nil {
+		log.Printf("警告: 解析更新时间出错: %v, 原始值: %s", err, updatedAt)
+		todo.UpdatedAt = time.Now() // 使用当前时间作为后备
+	}
+
+	// 处理可能为NULL的customSettings
+	if customSettings.Valid {
+		todo.CustomSettings = customSettings.String
+	} else {
+		todo.CustomSettings = ""
+	}
+
+	return &todo, nil
+}
