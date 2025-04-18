@@ -2,6 +2,7 @@ package controllers
 
 import (
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"MTimer/backend/controllers/types"
@@ -12,6 +13,7 @@ import (
 type StatsController struct {
 	dailyStatRepo    *models.DailyStatRepository
 	focusSessionRepo *models.FocusSessionRepository
+	eventStatRepo    *models.EventStatRepository
 }
 
 // NewStatsController 创建一个新的StatsController
@@ -19,6 +21,7 @@ func NewStatsController() *StatsController {
 	return &StatsController{
 		dailyStatRepo:    models.NewDailyStatRepository(),
 		focusSessionRepo: models.NewFocusSessionRepository(),
+		eventStatRepo:    models.NewEventStatRepository(),
 	}
 }
 
@@ -55,6 +58,8 @@ func (c *StatsController) GetStats(req types.GetStatsRequest) ([]*types.StatResp
 			PomodoroCount:      stat.PomodoroCount,
 			CustomCount:        stat.CustomCount,
 			TotalFocusSessions: stat.TotalFocusSessions,
+			PomodoroMinutes:    stat.PomodoroMinutes,
+			CustomMinutes:      stat.CustomMinutes,
 			TotalFocusMinutes:  stat.TotalFocusMinutes,
 			TotalBreakMinutes:  stat.TotalBreakMinutes,
 			TomatoHarvests:     stat.TomatoHarvests,
@@ -152,7 +157,7 @@ func (c *StatsController) calculateStreakDays(today string) (int, error) {
 		// 检查该天是否有专注记录
 		var count int
 		err := models.DB.QueryRow(`
-			SELECT COUNT(*) FROM focus_sessions 
+			SELECT COUNT(*) FROM focus_sessions
 			WHERE DATE(start_time) = ? AND end_time IS NOT NULL
 		`, checkDate).Scan(&count)
 
@@ -169,4 +174,202 @@ func (c *StatsController) calculateStreakDays(today string) (int, error) {
 	}
 
 	return streak, nil
+}
+
+// GetDailySummary 获取昨日小结数据
+func (c *StatsController) GetDailySummary() (*types.DailySummaryResponse, error) {
+	// 获取昨天的日期
+	yesterday := time.Now().AddDate(0, 0, -1).Format("2006-01-02")
+
+	// 获取昨天的统计数据
+	stats, err := c.dailyStatRepo.GetByDateRange(yesterday, yesterday)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果昨天没有数据，返回空结果
+	var yesterdayStat types.StatResponse
+	if len(stats) > 0 {
+		var timeRanges []string
+		if err := json.Unmarshal([]byte(stats[0].TimeRanges), &timeRanges); err == nil {
+			yesterdayStat = types.StatResponse{
+				Date:               stats[0].Date,
+				PomodoroCount:      stats[0].PomodoroCount,
+				CustomCount:        stats[0].CustomCount,
+				TotalFocusSessions: stats[0].TotalFocusSessions,
+				PomodoroMinutes:    stats[0].PomodoroMinutes,
+				CustomMinutes:      stats[0].CustomMinutes,
+				TotalFocusMinutes:  stats[0].TotalFocusMinutes,
+				TotalBreakMinutes:  stats[0].TotalBreakMinutes,
+				TomatoHarvests:     stats[0].TomatoHarvests,
+				TimeRanges:         timeRanges,
+			}
+		}
+	}
+
+	// 获取过去7天的日期范围
+	oneWeekAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	today := time.Now().Format("2006-01-02")
+
+	// 获取7天内的每日统计
+	weekStats, err := c.dailyStatRepo.GetByDateRange(oneWeekAgo, today)
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建每日趋势数据
+	var trendData []types.DailyTrendData
+	for _, stat := range weekStats {
+		trendData = append(trendData, types.DailyTrendData{
+			Date:              stat.Date,
+			TotalFocusMinutes: stat.TotalFocusMinutes,
+			PomodoroMinutes:   stat.PomodoroMinutes,
+			CustomMinutes:     stat.CustomMinutes,
+		})
+	}
+
+	return &types.DailySummaryResponse{
+		YesterdayStat: yesterdayStat,
+		WeekTrend:     trendData,
+	}, nil
+}
+
+// GetEventStats 获取事件统计数据
+func (c *StatsController) GetEventStats(req types.GetStatsRequest) (*types.EventStatsResponse, error) {
+	// 验证日期格式
+	if req.StartDate == "" {
+		// 默认为过去7天
+		req.StartDate = time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+	}
+
+	if req.EndDate == "" {
+		// 默认为今天
+		req.EndDate = time.Now().Format("2006-01-02")
+	}
+
+	// 获取时间段内的事件统计
+	eventStats, err := c.eventStatRepo.GetEventStatsByDateRange(req.StartDate, req.EndDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// 获取完成率统计
+	completionStats, err := c.eventStatRepo.GetCompletionStats(req.StartDate, req.EndDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// 按日期聚合工作量趋势
+	trendMap := make(map[string]int)
+	for _, stat := range eventStats {
+		trendMap[stat.Date] += stat.TotalFocusTime
+	}
+
+	var trendData []types.DailyTrendData
+	for date, minutes := range trendMap {
+		trendData = append(trendData, types.DailyTrendData{
+			Date:              date,
+			TotalFocusMinutes: minutes,
+		})
+	}
+
+	return &types.EventStatsResponse{
+		TotalEvents:     completionStats["total_events"].(int),
+		CompletedEvents: completionStats["completed_events"].(int),
+		CompletionRate:  completionStats["completion_rate"].(string),
+		TrendData:       trendData,
+	}, nil
+}
+
+// GetPomodoroStats 获取番茄统计数据
+func (c *StatsController) GetPomodoroStats(req types.GetStatsRequest) (*types.PomodoroStatsResponse, error) {
+	// 验证日期格式
+	if req.StartDate == "" {
+		// 默认为过去30天
+		req.StartDate = time.Now().AddDate(0, 0, -30).Format("2006-01-02")
+	}
+
+	if req.EndDate == "" {
+		// 默认为今天
+		req.EndDate = time.Now().Format("2006-01-02")
+	}
+
+	// 获取时间段内的每日统计
+	stats, err := c.dailyStatRepo.GetByDateRange(req.StartDate, req.EndDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// 计算番茄总数和查找最佳专注日
+	var totalPomodoros int
+	var bestDay types.StatResponse
+
+	for _, stat := range stats {
+		totalPomodoros += stat.TomatoHarvests
+
+		// 找出番茄数最多的一天
+		if stat.TomatoHarvests > bestDay.TomatoHarvests {
+			var timeRanges []string
+			if err := json.Unmarshal([]byte(stat.TimeRanges), &timeRanges); err == nil {
+				bestDay = types.StatResponse{
+					Date:               stat.Date,
+					PomodoroCount:      stat.PomodoroCount,
+					CustomCount:        stat.CustomCount,
+					TotalFocusSessions: stat.TotalFocusSessions,
+					PomodoroMinutes:    stat.PomodoroMinutes,
+					CustomMinutes:      stat.CustomMinutes,
+					TotalFocusMinutes:  stat.TotalFocusMinutes,
+					TotalBreakMinutes:  stat.TotalBreakMinutes,
+					TomatoHarvests:     stat.TomatoHarvests,
+					TimeRanges:         timeRanges,
+				}
+			}
+		}
+	}
+
+	// 构建番茄趋势数据
+	var trendData []types.DailyTrendData
+	var timeDistribution []types.TimeDistribution
+
+	// 时间分布统计
+	hourDistribution := make(map[int]int)
+
+	for _, stat := range stats {
+		// 添加趋势数据
+		trendData = append(trendData, types.DailyTrendData{
+			Date:            stat.Date,
+			PomodoroCount:   stat.PomodoroCount,
+			TomatoHarvests:  stat.TomatoHarvests,
+			PomodoroMinutes: stat.PomodoroMinutes,
+		})
+
+		// 解析时间段，统计各时间段的分布
+		var timeRanges []string
+		if err := json.Unmarshal([]byte(stat.TimeRanges), &timeRanges); err == nil {
+			for _, timeRange := range timeRanges {
+				// 假设时间格式为 "HH:MM~HH:MM"
+				var startHour, startMin, endHour, endMin int
+				_, err := fmt.Sscanf(timeRange, "%d:%d~%d:%d", &startHour, &startMin, &endHour, &endMin)
+				if err == nil {
+					// 按小时统计
+					hourDistribution[startHour]++
+				}
+			}
+		}
+	}
+
+	// 构建时间分布数据
+	for hour, count := range hourDistribution {
+		timeDistribution = append(timeDistribution, types.TimeDistribution{
+			Hour:  hour,
+			Count: count,
+		})
+	}
+
+	return &types.PomodoroStatsResponse{
+		TotalPomodoros:   totalPomodoros,
+		BestDay:          bestDay,
+		TrendData:        trendData,
+		TimeDistribution: timeDistribution,
+	}, nil
 }

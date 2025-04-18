@@ -141,6 +141,127 @@ export namespace types {
 		}
 	}
 	
+	export class DailyTrendData {
+	    date: string;
+	    total_focus_minutes?: number;
+	    pomodoro_minutes?: number;
+	    custom_minutes?: number;
+	    pomodoro_count?: number;
+	    tomato_harvests?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DailyTrendData(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.total_focus_minutes = source["total_focus_minutes"];
+	        this.pomodoro_minutes = source["pomodoro_minutes"];
+	        this.custom_minutes = source["custom_minutes"];
+	        this.pomodoro_count = source["pomodoro_count"];
+	        this.tomato_harvests = source["tomato_harvests"];
+	    }
+	}
+	export class StatResponse {
+	    date: string;
+	    pomodoro_count: number;
+	    custom_count: number;
+	    total_focus_sessions: number;
+	    pomodoro_minutes: number;
+	    custom_minutes: number;
+	    total_focus_minutes: number;
+	    total_break_minutes: number;
+	    tomato_harvests: number;
+	    time_ranges: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new StatResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.pomodoro_count = source["pomodoro_count"];
+	        this.custom_count = source["custom_count"];
+	        this.total_focus_sessions = source["total_focus_sessions"];
+	        this.pomodoro_minutes = source["pomodoro_minutes"];
+	        this.custom_minutes = source["custom_minutes"];
+	        this.total_focus_minutes = source["total_focus_minutes"];
+	        this.total_break_minutes = source["total_break_minutes"];
+	        this.tomato_harvests = source["tomato_harvests"];
+	        this.time_ranges = source["time_ranges"];
+	    }
+	}
+	export class DailySummaryResponse {
+	    yesterday_stat: StatResponse;
+	    week_trend: DailyTrendData[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DailySummaryResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.yesterday_stat = this.convertValues(source["yesterday_stat"], StatResponse);
+	        this.week_trend = this.convertValues(source["week_trend"], DailyTrendData);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class EventStatsResponse {
+	    total_events: number;
+	    completed_events: number;
+	    completion_rate: string;
+	    trend_data: DailyTrendData[];
+	
+	    static createFrom(source: any = {}) {
+	        return new EventStatsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total_events = source["total_events"];
+	        this.completed_events = source["completed_events"];
+	        this.completion_rate = source["completion_rate"];
+	        this.trend_data = this.convertValues(source["trend_data"], DailyTrendData);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class GetStatsRequest {
 	    start_date: string;
 	    end_date: string;
@@ -154,6 +275,56 @@ export namespace types {
 	        this.start_date = source["start_date"];
 	        this.end_date = source["end_date"];
 	    }
+	}
+	export class TimeDistribution {
+	    hour: number;
+	    count: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new TimeDistribution(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.hour = source["hour"];
+	        this.count = source["count"];
+	    }
+	}
+	export class PomodoroStatsResponse {
+	    total_pomodoros: number;
+	    best_day: StatResponse;
+	    trend_data: DailyTrendData[];
+	    time_distribution: TimeDistribution[];
+	
+	    static createFrom(source: any = {}) {
+	        return new PomodoroStatsResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.total_pomodoros = source["total_pomodoros"];
+	        this.best_day = this.convertValues(source["best_day"], StatResponse);
+	        this.trend_data = this.convertValues(source["trend_data"], DailyTrendData);
+	        this.time_distribution = this.convertValues(source["time_distribution"], TimeDistribution);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class StartFocusSessionRequest {
 	    todo_id: number;
@@ -185,32 +356,7 @@ export namespace types {
 	        this.session_id = source["session_id"];
 	    }
 	}
-	export class StatResponse {
-	    date: string;
-	    pomodoro_count: number;
-	    custom_count: number;
-	    total_focus_sessions: number;
-	    total_focus_minutes: number;
-	    total_break_minutes: number;
-	    tomato_harvests: number;
-	    time_ranges: string[];
 	
-	    static createFrom(source: any = {}) {
-	        return new StatResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.date = source["date"];
-	        this.pomodoro_count = source["pomodoro_count"];
-	        this.custom_count = source["custom_count"];
-	        this.total_focus_sessions = source["total_focus_sessions"];
-	        this.total_focus_minutes = source["total_focus_minutes"];
-	        this.total_break_minutes = source["total_break_minutes"];
-	        this.tomato_harvests = source["tomato_harvests"];
-	        this.time_ranges = source["time_ranges"];
-	    }
-	}
 	export class StatSummary {
 	    total_pomodoro_count: number;
 	    total_focus_minutes: number;
@@ -229,6 +375,7 @@ export namespace types {
 	        this.streak_days = source["streak_days"];
 	    }
 	}
+	
 	
 	export class UpdateTodoRequest {
 	    todo_id: number;

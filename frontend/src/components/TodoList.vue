@@ -253,7 +253,7 @@ const toggleTodo = (id: number) => {
 const openEditModal = (todo: Todo) => {
   console.log('打开编辑模态框', todo);
   editingTodo.value = todo;
-  editForm.value = {
+    editForm.value = {
     name: todo.name || todo.text || '',
     mode: todo.mode,
     estimatedPomodoros: todo.estimatedPomodoros
@@ -270,9 +270,9 @@ const saveEdit = async () => {
 
   // 更新待办事项设置（名称、专注模式和预计专注次数）
   const todo = {
-    todo_id: editingTodo.value.id,
+      todo_id: editingTodo.value.id,
     name: editForm.value.name,
-    mode: editForm.value.mode,
+      mode: editForm.value.mode,
     estimatedPomodoros: editForm.value.estimatedPomodoros,
     // 如果是自定义模式，确保保留自定义设置
     customSettings: editForm.value.mode === 'custom' && editingTodo.value.customSettings ? {
@@ -358,11 +358,11 @@ const saveTimerSettings = async () => {
         try {
             // 创建更新请求对象
             const todoToUpdate: any = {
-                todo_id: todoId,
-                name: settingTodo.value.name || settingTodo.value.text || '',
-                mode: todoMode,
-                estimatedPomodoros: estimatedPomodoros.value
-            };
+            todo_id: todoId,
+            name: settingTodo.value.name || settingTodo.value.text || '',
+            mode: todoMode,
+            estimatedPomodoros: estimatedPomodoros.value
+        };
 
             // 如果是自定义模式，添加自定义设置
             if (todoMode === 'custom') {
@@ -443,7 +443,7 @@ const saveTimerSettings = async () => {
         } catch (error) {
             console.error('更新专注设置失败:', error);
             message.error('更新专注设置失败');
-            showTimerSettingsModal.value = false;
+        showTimerSettingsModal.value = false;
         }
     }
 }
@@ -1042,16 +1042,16 @@ const updateEstimatedTimeDisplay = () => {
             </n-form-item>
 
             <template v-if="currentMode === 'pomodoro'">
-                <!-- 番茄工作法介绍 -->
+            <!-- 番茄工作法介绍 -->
                 <div class="pomodoro-info-box">
-                    <h3>番茄工作法 <span class="tomato-emoji">🍅</span></h3>
-                    <p>每个番茄钟包含：</p>
-                    <ul>
-                        <li><span class="highlight">专注工作：</span> 25分钟</li>
-                        <li><span class="highlight">短休息：</span> 5分钟</li>
-                        <li><span class="highlight">长休息：</span> 每完成4个番茄钟后，休息15分钟</li>
-                    </ul>
-                </div>
+                <h3>番茄工作法 <span class="tomato-emoji">🍅</span></h3>
+                <p>每个番茄钟包含：</p>
+                <ul>
+                    <li><span class="highlight">专注工作：</span> 25分钟</li>
+                    <li><span class="highlight">短休息：</span> 5分钟</li>
+                    <li><span class="highlight">长休息：</span> 每完成4个番茄钟后，休息15分钟</li>
+                </ul>
+            </div>
             </template>
 
             <template v-else>
@@ -1059,7 +1059,7 @@ const updateEstimatedTimeDisplay = () => {
                 <div class="custom-info-box">
                     <h3>自定义专注 <span class="timer-emoji">⏱️</span></h3>
                     <p>根据个人需求自由设置专注和休息时间:</p>
-                </div>
+            </div>
 
                 <n-form-item label="专注时长 (分钟)">
                     <n-input-number v-model:value="customWorkTime" :min="1" :max="120" />
@@ -1077,7 +1077,7 @@ const updateEstimatedTimeDisplay = () => {
                 </n-form-item>
             </template>
 
-            <n-divider />
+                <n-divider />
 
             <n-form-item label="预计需要的专注次数">
                 <n-input-number v-model:value="estimatedPomodoros" :min="1" :max="10" />

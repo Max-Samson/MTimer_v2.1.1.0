@@ -10,6 +10,12 @@ export function DeleteTodo(arg1:number):Promise<types.BasicResponse>;
 
 export function GetAllTodos():Promise<Array<types.TodoItem>>;
 
+export function GetDailySummary():Promise<types.DailySummaryResponse>;
+
+export function GetEventStats(arg1:types.GetStatsRequest):Promise<types.EventStatsResponse>;
+
+export function GetPomodoroStats(arg1:types.GetStatsRequest):Promise<types.PomodoroStatsResponse>;
+
 export function GetStats(arg1:types.GetStatsRequest):Promise<Array<types.StatResponse>>;
 
 export function GetStatsSummary():Promise<types.StatSummary>;

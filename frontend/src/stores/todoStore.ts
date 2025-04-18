@@ -256,7 +256,29 @@ export const useTodoStore = defineStore('todo', () => {
   const setCurrentTodo = (id: number) => {
     const todo = todos.value.find(todo => todo.id === id)
     if (todo) {
-      currentTodo.value = todo
+      // 保存之前的currentTodo状态，以便在设置新的currentTodo时保留一些关键信息
+      const prevCurrentTodo = currentTodo.value;
+      const wasInProgress = prevCurrentTodo?.status === 'inProgress';
+
+      // 设置新的当前任务
+      currentTodo.value = todo;
+
+      // 如果之前的任务是进行中状态，确保新设置的任务也保持进行中状态
+      if (wasInProgress && todo.id === prevCurrentTodo?.id) {
+        console.log(`恢复任务(ID:${id})的进行中状态`);
+        todo.status = 'inProgress';
+
+        // 如果有上次专注时间戳，保留它
+        if (prevCurrentTodo?.lastFocusTimestamp) {
+          todo.lastFocusTimestamp = prevCurrentTodo.lastFocusTimestamp;
+        } else {
+          todo.lastFocusTimestamp = Date.now();
+        }
+      }
+
+      console.log(`当前任务已设置为ID:${id}, 名称:${todo.name || todo.text}, 状态:${todo.status}`);
+    } else {
+      console.warn(`未找到ID为${id}的待办事项，无法设置为当前任务`);
     }
   }
 

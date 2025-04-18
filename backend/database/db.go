@@ -153,7 +153,8 @@ func createTables() error {
 			created_at DATETIME NOT NULL,
 			updated_at DATETIME NOT NULL,
 			estimated_pomodoros INTEGER DEFAULT 1,
-			custom_settings TEXT DEFAULT NULL
+			custom_settings TEXT DEFAULT NULL,
+			completed_at DATETIME DEFAULT NULL
 		);
 	`)
 	if err != nil {
@@ -170,6 +171,7 @@ func createTables() error {
 			break_time INTEGER DEFAULT 0,
 			duration INTEGER DEFAULT 0,
 			mode INTEGER NOT NULL,
+			date DATE GENERATED ALWAYS AS (date(start_time)) STORED,
 			FOREIGN KEY (todo_id) REFERENCES todos (todo_id) ON DELETE CASCADE
 		);
 	`)
@@ -181,16 +183,287 @@ func createTables() error {
 	_, err = DB.Exec(`
 		CREATE TABLE IF NOT EXISTS daily_stats (
 			stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
-			date TEXT NOT NULL UNIQUE,
+			date DATE NOT NULL UNIQUE,
 			pomodoro_count INTEGER DEFAULT 0,
 			custom_count INTEGER DEFAULT 0,
 			total_focus_sessions INTEGER DEFAULT 0,
+			pomodoro_minutes INTEGER DEFAULT 0,
+			custom_minutes INTEGER DEFAULT 0,
 			total_focus_minutes INTEGER DEFAULT 0,
 			total_break_minutes INTEGER DEFAULT 0,
 			tomato_harvests INTEGER DEFAULT 0,
 			time_ranges TEXT DEFAULT '[]'
 		);
 	`)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// 创建event_stats表 - 用于事件统计
+	_, err = DB.Exec(`
+		CREATE TABLE IF NOT EXISTS event_stats (
+			stat_id INTEGER PRIMARY KEY AUTOINCREMENT,
+			event_id INTEGER NOT NULL,
+			date DATE NOT NULL,
+			focus_count INTEGER DEFAULT 0,
+			total_focus_time INTEGER DEFAULT 0,
+			mode INTEGER NOT NULL,
+			completed INTEGER DEFAULT 0,
+			UNIQUE(event_id, date)
+		);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// 初始化测试数据
+	if err := initTestData(); err != nil {
+		log.Printf("初始化测试数据失败: %v", err)
+		// 测试数据初始化失败不应该影响应用启动
+	}
+
+	return nil
+}
+
+// initTestData 初始化测试数据
+func initTestData() error {
+	// 检查是否已经有待办事项数据
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM todos").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("检查待办事项数据失败: %w", err)
+	}
+
+	// 如果已有待办事项，不再添加测试数据
+	if count > 0 {
+		log.Println("已存在待办事项数据，跳过测试数据初始化")
+		return nil
+	}
+
+	log.Println("开始初始化测试数据...")
+
+	// 开始事务
+	tx, err := DB.Begin()
+	if err != nil {
+		return fmt.Errorf("开始事务失败: %w", err)
+	}
+	defer tx.Rollback()
+
+	// 1. 添加测试待办事项
+	testTodos := []struct {
+		name               string
+		mode               int // 0: pomodoro, 1: custom
+		status             string
+		estimatedPomodoros int
+		completedAt        string // 为空表示未完成
+	}{
+		{"完成项目报告", 0, "completed", 5, "2025-04-01 18:30:00"},
+		{"学习Vue.js基础", 0, "completed", 3, "2025-04-02 16:45:00"},
+		{"阅读技术文档", 1, "completed", 2, "2025-04-03 10:15:00"},
+		{"准备演讲材料", 0, "pending", 4, ""},
+		{"重构代码模块", 1, "pending", 6, ""},
+		{"修复UI界面bug", 0, "completed", 2, "2025-04-04 14:20:00"},
+		{"学习TypeScript", 1, "pending", 8, ""},
+		{"编写单元测试", 0, "completed", 3, "2025-04-05 11:00:00"},
+		{"开发新功能", 1, "completed", 7, "2025-04-06 17:30:00"},
+		{"Code Review", 0, "pending", 2, ""},
+	}
+
+	for _, todo := range testTodos {
+		// 添加待办事项
+		var todoId int64
+		var stmt *sql.Stmt
+
+		if todo.completedAt == "" {
+			// 未完成的待办事项
+			stmt, err = tx.Prepare(`
+				INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros)
+				VALUES (?, ?, ?, datetime('now', '-7 days'), datetime('now'), ?)
+			`)
+			if err != nil {
+				return fmt.Errorf("准备插入待办事项SQL失败: %w", err)
+			}
+
+			res, err := stmt.Exec(todo.name, todo.mode, todo.status, todo.estimatedPomodoros)
+			if err != nil {
+				stmt.Close()
+				return fmt.Errorf("插入待办事项失败: %w", err)
+			}
+
+			todoId, err = res.LastInsertId()
+			stmt.Close()
+			if err != nil {
+				return fmt.Errorf("获取待办事项ID失败: %w", err)
+			}
+		} else {
+			// 已完成的待办事项
+			stmt, err = tx.Prepare(`
+				INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, completed_at)
+				VALUES (?, ?, ?, datetime('now', '-7 days'), datetime('now'), ?, ?)
+			`)
+			if err != nil {
+				return fmt.Errorf("准备插入已完成待办事项SQL失败: %w", err)
+			}
+
+			res, err := stmt.Exec(todo.name, todo.mode, todo.status, todo.estimatedPomodoros, todo.completedAt)
+			if err != nil {
+				stmt.Close()
+				return fmt.Errorf("插入已完成待办事项失败: %w", err)
+			}
+
+			todoId, err = res.LastInsertId()
+			stmt.Close()
+			if err != nil {
+				return fmt.Errorf("获取已完成待办事项ID失败: %w", err)
+			}
+		}
+
+		// 2. 为每个待办事项添加专注会话
+		// 如果是已完成的待办事项，添加相应数量的已完成专注会话
+		if todo.completedAt != "" {
+			// 为已完成的待办事项添加专注会话
+			for i := 0; i < todo.estimatedPomodoros; i++ {
+				// 生成随机的日期时间，在过去7天内
+				dayOffset := -i % 7 // 分散在过去7天
+				hour := 9 + (i % 8) // 9点到16点之间
+
+				stmt, err = tx.Prepare(`
+					INSERT INTO focus_sessions (todo_id, start_time, end_time, break_time, duration, mode)
+					VALUES (?, datetime('now', ? || ' days', ? || ' hours'), datetime('now', ? || ' days', ? || ' hours', '+25 minutes'), 5, 25, ?)
+				`)
+				if err != nil {
+					return fmt.Errorf("准备插入专注会话SQL失败: %w", err)
+				}
+
+				_, err = stmt.Exec(todoId, dayOffset, hour, dayOffset, hour, todo.mode)
+				stmt.Close()
+				if err != nil {
+					return fmt.Errorf("插入专注会话失败: %w", err)
+				}
+			}
+		} else {
+			// 为未完成的待办事项添加一些进行中或已完成的专注会话
+			completedPomodoros := todo.estimatedPomodoros / 2 // 完成一半
+
+			for i := 0; i < completedPomodoros; i++ {
+				dayOffset := -i % 7 // 分散在过去7天
+				hour := 9 + (i % 8) // 9点到16点之间
+
+				stmt, err = tx.Prepare(`
+					INSERT INTO focus_sessions (todo_id, start_time, end_time, break_time, duration, mode)
+					VALUES (?, datetime('now', ? || ' days', ? || ' hours'), datetime('now', ? || ' days', ? || ' hours', '+25 minutes'), 5, 25, ?)
+				`)
+				if err != nil {
+					return fmt.Errorf("准备插入未完成待办事项的专注会话SQL失败: %w", err)
+				}
+
+				_, err = stmt.Exec(todoId, dayOffset, hour, dayOffset, hour, todo.mode)
+				stmt.Close()
+				if err != nil {
+					return fmt.Errorf("插入未完成待办事项的专注会话失败: %w", err)
+				}
+			}
+		}
+	}
+
+	// 3. 为过去7天生成每日统计数据
+	for i := 0; i < 7; i++ {
+		// 随机生成一些统计数据
+		pomodoroCount := 5 + (i % 5) // 5-9个番茄钟
+		customCount := 2 + (i % 3)   // 2-4个自定义专注
+		totalSessions := pomodoroCount + customCount
+		pomodoroMinutes := pomodoroCount * 25
+		customMinutes := customCount * 30
+		totalFocusMinutes := pomodoroMinutes + customMinutes
+		breakMinutes := totalSessions * 5
+		tomatoHarvests := pomodoroCount - 1 // 不是每个都收获
+
+		// 生成时间范围JSON字符串
+		timeRanges := make([]string, 0)
+		morningHours := []int{9, 10, 11}
+		afternoonHours := []int{14, 15, 16, 17}
+
+		for _, hour := range morningHours {
+			if i%2 == 0 || hour == 10 { // 确保至少有一个上午的时间段
+				timeRanges = append(timeRanges, fmt.Sprintf("%02d:00~%02d:25", hour, hour))
+			}
+		}
+
+		for _, hour := range afternoonHours {
+			if i%2 == 1 || hour == 15 { // 确保至少有一个下午的时间段
+				timeRanges = append(timeRanges, fmt.Sprintf("%02d:00~%02d:25", hour, hour))
+			}
+		}
+
+		// 使用Go的字符串连接方式构建JSON数组
+		timeRangesStr := "["
+		for idx, tr := range timeRanges {
+			if idx > 0 {
+				timeRangesStr += ","
+			}
+			timeRangesStr += "\"" + tr + "\""
+		}
+		timeRangesStr += "]"
+
+		stmt, err := tx.Prepare(`
+			INSERT INTO daily_stats (date, pomodoro_count, custom_count, total_focus_sessions,
+				pomodoro_minutes, custom_minutes, total_focus_minutes, total_break_minutes,
+				tomato_harvests, time_ranges)
+			VALUES (date('now', ? || ' days'), ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`)
+		if err != nil {
+			return fmt.Errorf("准备插入每日统计SQL失败: %w", err)
+		}
+
+		_, err = stmt.Exec(-i, pomodoroCount, customCount, totalSessions,
+			pomodoroMinutes, customMinutes, totalFocusMinutes, breakMinutes,
+			tomatoHarvests, timeRangesStr)
+		stmt.Close()
+		if err != nil {
+			return fmt.Errorf("插入每日统计失败: %w", err)
+		}
+	}
+
+	// 4. 生成事件统计数据
+	for todoId := 1; todoId <= len(testTodos); todoId++ {
+		// 为每个待办事项在过去几天中生成统计数据
+		for i := 0; i < 5; i++ {
+			if i%2 == 0 || todoId%3 == 0 { // 不是每个待办事项每天都有数据
+				mode := 0
+				if todoId%2 == 0 {
+					mode = 1 // 偶数ID使用自定义模式
+				}
+
+				focusCount := 1 + (todoId % 3) // 1-3次专注
+				focusTime := focusCount * 25   // 每次25分钟
+				completed := 0
+				if i == 0 && todoId <= 6 { // 部分待办事项标记为已完成
+					completed = 1
+				}
+
+				stmt, err := tx.Prepare(`
+					INSERT INTO event_stats (event_id, date, focus_count, total_focus_time, mode, completed)
+					VALUES (?, date('now', ? || ' days'), ?, ?, ?, ?)
+				`)
+				if err != nil {
+					return fmt.Errorf("准备插入事件统计SQL失败: %w", err)
+				}
+
+				_, err = stmt.Exec(todoId, -i, focusCount, focusTime, mode, completed)
+				stmt.Close()
+				if err != nil {
+					return fmt.Errorf("插入事件统计失败: %w", err)
+				}
+			}
+		}
+	}
+
+	// 提交事务
+	err = tx.Commit()
+	if err != nil {
+		return fmt.Errorf("提交事务失败: %w", err)
+	}
+
+	log.Println("测试数据初始化完成")
+	return nil
 }

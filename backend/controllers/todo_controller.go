@@ -14,6 +14,7 @@ type TodoController struct {
 	todoRepo         *models.TodoRepository
 	focusSessionRepo *models.FocusSessionRepository
 	dailyStatRepo    *models.DailyStatRepository
+	eventStatRepo    *models.EventStatRepository
 }
 
 // NewTodoController 创建一个新的TodoController
@@ -22,6 +23,7 @@ func NewTodoController() *TodoController {
 		todoRepo:         models.NewTodoRepository(),
 		focusSessionRepo: models.NewFocusSessionRepository(),
 		dailyStatRepo:    models.NewDailyStatRepository(),
+		eventStatRepo:    models.NewEventStatRepository(),
 	}
 }
 
@@ -259,6 +261,15 @@ func (c *TodoController) CompleteFocusSession(req types.CompleteFocusSessionRequ
 		return types.BasicResponse{
 			Success: false,
 			Message: "更新统计数据失败: " + err.Error(),
+		}, err
+	}
+
+	// 更新任务历史统计数据
+	err = c.eventStatRepo.UpdateEventStats(todoID, today)
+	if err != nil {
+		return types.BasicResponse{
+			Success: false,
+			Message: "更新任务历史统计失败: " + err.Error(),
 		}, err
 	}
 

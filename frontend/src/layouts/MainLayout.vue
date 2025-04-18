@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { h, ref, inject } from 'vue'
+import { h, ref, inject, nextTick } from 'vue'
 import { NLayout, NLayoutHeader, NLayoutContent, NSpace, NButton, NIcon, darkTheme, NTooltip, NDrawer, NDrawerContent, NTabPane, NTabs, NDropdown } from 'naive-ui'
 import { RouterView } from 'vue-router'
 import TomatoTimer from '../components/TomatoTimer.vue'
 import TodoList from '../components/TodoList.vue'
 import Navigation from '../components/Navigation.vue'
 import SettingsView from '../views/SettingsView.vue'
+import StatisticsView from '../views/StatisticsView.vue'
 import MusicPlayer from '../components/MusicPlayer.vue'
 import MiniMusicController from '../components/MiniMusicController.vue'
 import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task } from '@vicons/carbon'
@@ -51,6 +52,66 @@ const modeOptions = [
         key: 'custom'
     }
 ]
+
+// 标签页切换前的处理
+const handleTabChange = (tabName: string) => {
+    // 获取当前正在进行中的任务及计时器状态
+    const currentTaskId = todoStore.currentTodo?.id;
+    const isTimerRunning = timerStore.isRunning;
+
+    console.log(`切换标签页到: ${tabName}, 当前任务ID: ${currentTaskId}, 计时器运行状态: ${isTimerRunning}`);
+
+    // 从任何标签页切换时，如果有任务正在进行中，确保保持其状态
+    if (currentTaskId) {
+        console.log('标签页切换，保持当前任务进行中状态');
+
+        // 设置新的标签页
+        activeTab.value = tabName;
+
+        // 记录当前任务的重要状态
+        const currentTodo = todoStore.currentTodo;
+        const currentTime = timerStore.time;
+        const initialTime = timerStore.initialTime;
+        const currentMode = timerStore.currentMode;
+        const isBreak = timerStore.isBreak;
+
+        // 切换标签页后，确保待办事项不会被刷新
+        nextTick(() => {
+            // 确保正在进行中的任务状态不会被重置
+            if (currentTodo) {
+                todoStore.setCurrentTodo(currentTodo.id);
+
+                // 显式设置任务状态为进行中
+                const todoItem = todoStore.todos.find(t => t.id === currentTodo.id);
+                if (todoItem) {
+                    todoStore.setTodoStatus(todoItem.id, 'inProgress');
+                }
+
+                // 确保计时器状态不会被重置
+                if (isTimerRunning) {
+                    // 恢复计时器状态
+                    timerStore.restoreTimerState({
+                        time: currentTime,
+                        initialTime: initialTime,
+                        isRunning: true,
+                        isBreak: isBreak,
+                        currentMode: currentMode
+                    });
+
+                    console.log('已恢复计时器状态:', {
+                        time: currentTime,
+                        isRunning: true,
+                        currentMode: currentMode,
+                        isBreak: isBreak
+                    });
+                }
+            }
+        });
+    } else {
+        // 普通标签页切换
+        activeTab.value = tabName;
+    }
+}
 
 const toggleSettings = () => {
     showSettings.value = !showSettings.value
@@ -173,7 +234,7 @@ const changeTimerMode = (key: string) => {
 
                 <!-- 正常模式显示右侧列 -->
                 <div v-if="!isFullscreen" class="right-column">
-                    <n-tabs v-model:value="activeTab" type="line" animated>
+                    <n-tabs v-model:value="activeTab" type="line" animated @update:value="handleTabChange">
                         <n-tab-pane name="todo">
                             <template #tab>
                                 <div class="tab-item">
@@ -194,10 +255,7 @@ const changeTimerMode = (key: string) => {
                                     <span class="tab-label">数据统计</span>
                                 </div>
                             </template>
-                            <div class="stats-container">
-                                <h3>数据统计</h3>
-                                <p>此处将显示专注时长和完成任务的统计图表</p>
-                            </div>
+                            <statistics-view />
                         </n-tab-pane>
                     </n-tabs>
                 </div>

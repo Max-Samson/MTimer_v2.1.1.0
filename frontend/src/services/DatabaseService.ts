@@ -81,10 +81,46 @@ export interface StatResponse {
   pomodoroCount: number
   customCount: number
   totalFocusSessions: number
+  pomodoroMinutes: number
+  customMinutes: number
   totalFocusMinutes: number
   totalBreakMinutes: number
   tomatoHarvests: number
-  timeRanges: string
+  timeRanges: string[]
+}
+
+export interface DailyTrendData {
+  date: string
+  totalFocusMinutes?: number
+  pomodoroMinutes?: number
+  customMinutes?: number
+  pomodoroCount?: number
+  tomatoHarvests?: number
+  completedTasks?: number
+}
+
+export interface TimeDistribution {
+  hour: number
+  count: number
+}
+
+export interface DailySummaryResponse {
+  yesterdayStat: StatResponse
+  weekTrend: DailyTrendData[]
+}
+
+export interface EventStatsResponse {
+  totalEvents: number
+  completedEvents: number
+  completionRate: string
+  trendData: DailyTrendData[]
+}
+
+export interface PomodoroStatsResponse {
+  totalPomodoros: number
+  bestDay: StatResponse
+  trendData: DailyTrendData[]
+  timeDistribution: TimeDistribution[]
 }
 
 export interface GetStatsRequest {
@@ -358,20 +394,24 @@ class DatabaseService {
             pomodoroCount: 5,
             customCount: 2,
             totalFocusSessions: 7,
+            pomodoroMinutes: 155,
+            customMinutes: 30,
             totalFocusMinutes: 155,
             totalBreakMinutes: 30,
             tomatoHarvests: 5,
-            timeRanges: JSON.stringify(['9:00-10:30', '14:00-16:00'])
+            timeRanges: ['9:00-10:30', '14:00-16:00']
           },
           {
             date: yesterday.toISOString().split('T')[0],
             pomodoroCount: 3,
             customCount: 1,
             totalFocusSessions: 4,
+            pomodoroMinutes: 100,
+            customMinutes: 20,
             totalFocusMinutes: 100,
             totalBreakMinutes: 20,
             tomatoHarvests: 3,
-            timeRanges: JSON.stringify(['10:00-11:30', '15:00-16:00'])
+            timeRanges: ['10:00-11:30', '15:00-16:00']
           }
         ];
 
@@ -383,6 +423,394 @@ class DatabaseService {
     } catch (error) {
       console.error('获取统计数据失败:', error);
       return [];
+    }
+  }
+
+  // 获取昨日小结数据
+  async getDailySummary(): Promise<DailySummaryResponse> {
+    try {
+      if (!App) {
+        console.warn('Wails绑定未找到，无法获取真实数据');
+        // 返回空数据结构
+        return {
+          yesterdayStat: {
+            date: '',
+            pomodoroCount: 0,
+            customCount: 0,
+            totalFocusSessions: 0,
+            pomodoroMinutes: 0,
+            customMinutes: 0,
+            totalFocusMinutes: 0,
+            totalBreakMinutes: 0,
+            tomatoHarvests: 0,
+            timeRanges: []
+          },
+          weekTrend: []
+        };
+      }
+
+      // 获取过去7天的统计数据
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const today = new Date();
+
+      // 使用现有的GetStats API获取数据
+      const allStats = await App.GetStats({
+        start_date: oneWeekAgo.toISOString().split('T')[0],
+        end_date: today.toISOString().split('T')[0]
+      });
+
+      console.log('获取到统计数据:', allStats);
+
+      // 把后端数据格式转换为前端格式
+      const stats = allStats.map(stat => ({
+        date: stat.date,
+        pomodoroCount: stat.pomodoro_count,
+        customCount: stat.custom_count,
+        totalFocusSessions: stat.total_focus_sessions,
+        pomodoroMinutes: stat.pomodoro_minutes || 0,
+        customMinutes: stat.custom_minutes || 0,
+        totalFocusMinutes: stat.total_focus_minutes,
+        totalBreakMinutes: stat.total_break_minutes,
+        tomatoHarvests: stat.tomato_harvests,
+        timeRanges: stat.time_ranges || []
+      }));
+
+      // 找出昨天的数据
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayString = yesterday.toISOString().split('T')[0];
+
+      let yesterdayStat = stats.find(s => s.date === yesterdayString);
+
+      // 如果没有找到昨天的数据，使用空数据
+      if (!yesterdayStat) {
+        yesterdayStat = {
+          date: yesterdayString,
+          pomodoroCount: 0,
+          customCount: 0,
+          totalFocusSessions: 0,
+          pomodoroMinutes: 0,
+          customMinutes: 0,
+          totalFocusMinutes: 0,
+          totalBreakMinutes: 0,
+          tomatoHarvests: 0,
+          timeRanges: []
+        };
+      }
+
+      // 创建趋势数据
+      const weekTrend = stats.map(stat => ({
+        date: stat.date,
+        totalFocusMinutes: stat.totalFocusMinutes,
+        pomodoroMinutes: stat.pomodoroMinutes,
+        customMinutes: stat.customMinutes,
+        pomodoroCount: stat.pomodoroCount,
+        tomatoHarvests: stat.tomatoHarvests
+      }));
+
+      // 按日期排序
+      weekTrend.sort((a, b) => a.date.localeCompare(b.date));
+
+      return {
+        yesterdayStat,
+        weekTrend
+      };
+    } catch (error) {
+      console.error('获取每日统计数据失败:', error);
+      // 返回空数据
+      return {
+        yesterdayStat: {
+          date: '',
+          pomodoroCount: 0,
+          customCount: 0,
+          totalFocusSessions: 0,
+          pomodoroMinutes: 0,
+          customMinutes: 0,
+          totalFocusMinutes: 0,
+          totalBreakMinutes: 0,
+          tomatoHarvests: 0,
+          timeRanges: []
+        },
+        weekTrend: []
+      };
+    }
+  }
+
+  // 获取事件统计数据
+  async getEventStats(startDate: string, endDate: string): Promise<EventStatsResponse> {
+    try {
+      if (!App) {
+        console.warn('Wails绑定未找到，无法获取真实数据');
+        // 返回空数据结构
+        return {
+          totalEvents: 0,
+          completedEvents: 0,
+          completionRate: '0%',
+          trendData: []
+        };
+      }
+
+      console.log(`获取事件统计数据: ${startDate} 至 ${endDate}`);
+
+      // 使用现有的GetStats API获取数据
+      const statsData = await App.GetStats({
+        start_date: startDate,
+        end_date: endDate
+      });
+
+      console.log('获取到统计数据:', statsData);
+
+      // 从后端数据构建事件统计
+      const stats = statsData.map((stat: any) => ({
+        date: stat.date,
+        totalFocusMinutes: stat.total_focus_minutes || 0
+      }));
+
+      // 获取总事件数据，这里从待办事项获取
+      let totalEvents = 0;
+      let completedEvents = 0;
+
+      // 尝试获取所有待办事项
+      try {
+        const todos = await App.GetAllTodos();
+
+        // 过滤在日期范围内的待办事项
+        const filteredTodos = todos.filter((todo: any) => {
+          const createdTimestamp = todo.created_at;
+          if (!createdTimestamp) return false;
+
+          const createdDate = new Date(createdTimestamp * 1000).toISOString().split('T')[0];
+          return createdDate >= startDate && createdDate <= endDate;
+        });
+
+        totalEvents = filteredTodos.length;
+        completedEvents = filteredTodos.filter((todo: any) => todo.status === 'completed').length;
+      } catch (err) {
+        console.error('获取待办事项失败:', err);
+      }
+
+      const completionRate = totalEvents > 0
+        ? ((completedEvents / totalEvents) * 100).toFixed(1) + '%'
+        : '0%';
+
+      return {
+        totalEvents,
+        completedEvents,
+        completionRate,
+        trendData: stats
+      };
+    } catch (error) {
+      console.error('获取事件统计数据失败:', error);
+      // 返回空数据
+      return {
+        totalEvents: 0,
+        completedEvents: 0,
+        completionRate: '0%',
+        trendData: []
+      };
+    }
+  }
+
+  // 获取番茄统计数据
+  async getPomodoroStats(startDate: string, endDate: string): Promise<PomodoroStatsResponse> {
+    try {
+      if (!App) {
+        console.warn('开发模式：返回模拟番茄统计数据');
+        return this.getEmptyPomodoroStats(); // 使用空数据结构替代模拟数据
+      }
+
+      const request = { startDate, endDate };
+      console.log(`获取从 ${startDate} 到 ${endDate} 的番茄统计数据`);
+
+      // 使用GetStats API获取数据
+      const statsData = await App.GetStats({
+        start_date: startDate,
+        end_date: endDate
+      });
+
+      // 数据验证和修复
+      if (!statsData || !Array.isArray(statsData)) {
+        console.error('从后端获取到的统计数据为空或格式不正确');
+        return this.getEmptyPomodoroStats();
+      }
+
+      // 将后端数据转换为前端需要的格式
+      const stats = statsData.map((stat: any) => ({
+        date: stat.date,
+        pomodoroCount: stat.pomodoro_count || 0,
+        customCount: stat.custom_count || 0,
+        totalFocusSessions: stat.total_focus_sessions || 0,
+        pomodoroMinutes: stat.pomodoro_minutes || 0,
+        customMinutes: stat.custom_minutes || 0,
+        totalFocusMinutes: stat.total_focus_minutes || 0,
+        totalBreakMinutes: stat.total_break_minutes || 0,
+        tomatoHarvests: stat.tomato_harvests || 0,
+        timeRanges: stat.time_ranges || []
+      }));
+
+      // 计算总番茄数
+      const totalPomodoros = stats.reduce((sum, stat) => sum + stat.pomodoroCount, 0);
+
+      // 找出最佳一天（专注时间最长的）
+      const bestDay = stats.reduce((best, current) =>
+        (current.totalFocusMinutes > best.totalFocusMinutes) ? current : best,
+        {
+          date: '',
+          pomodoroCount: 0,
+          customCount: 0,
+          totalFocusSessions: 0,
+          pomodoroMinutes: 0,
+          customMinutes: 0,
+          totalFocusMinutes: 0,
+          totalBreakMinutes: 0,
+          tomatoHarvests: 0,
+          timeRanges: []
+        }
+      );
+
+      // 创建趋势数据
+      const rawTrendData: DailyTrendData[] = stats.map(stat => ({
+        date: stat.date,
+        pomodoroCount: stat.pomodoroCount,
+        pomodoroMinutes: stat.pomodoroMinutes,
+        totalFocusMinutes: stat.totalFocusMinutes,
+        tomatoHarvests: stat.tomatoHarvests,
+        // 添加completedTasks字段，暂时设为0
+        completedTasks: 0
+      }));
+
+      // 对趋势数据进行验证和处理
+      const validatedTrendData = rawTrendData.map(item => this.validateTrendData(item));
+
+      // 创建时间分布数据
+      // 解析timeRanges来构建小时分布
+      const hourDistribution: { [key: number]: number } = {};
+
+      // 初始化24小时的分布
+      for (let i = 0; i < 24; i++) {
+        hourDistribution[i] = 0;
+      }
+
+      // 解析每个时间段并累加到对应小时
+      stats.forEach(stat => {
+        if (!Array.isArray(stat.timeRanges)) return;
+
+        stat.timeRanges.forEach((timeRange: string) => {
+          // 格式例如："09:00-09:25" 或 "09:00~09:25"
+          const startTime = timeRange.split(/[-~]/)[0].trim();
+          if (startTime && startTime.includes(':')) {
+            const hour = parseInt(startTime.split(':')[0], 10);
+            if (!isNaN(hour) && hour >= 0 && hour < 24) {
+              hourDistribution[hour] += 1;
+            }
+          }
+        });
+      });
+
+      // 转换为数组格式
+      const timeDistributionArray: TimeDistribution[] = [];
+      for (let i = 0; i < 24; i++) {
+        timeDistributionArray.push({
+          hour: i,
+          count: hourDistribution[i] || 0
+        });
+      }
+
+      // 排序趋势数据确保按日期顺序
+      validatedTrendData.sort((a, b) => {
+        return new Date(a.date).getTime() - new Date(b.date).getTime();
+      });
+
+      return {
+        totalPomodoros,
+        bestDay,
+        trendData: validatedTrendData,
+        timeDistribution: timeDistributionArray
+      };
+    } catch (error) {
+      console.error('获取番茄统计数据失败:', error);
+      return this.getEmptyPomodoroStats();
+    }
+  }
+
+  // 验证趋势数据，确保所有字段都有合法值
+  private validateTrendData(item: DailyTrendData): DailyTrendData {
+    return {
+      date: item.date || new Date().toISOString().split('T')[0],
+      totalFocusMinutes: typeof item.totalFocusMinutes === 'number' ? item.totalFocusMinutes : 0,
+      pomodoroMinutes: typeof item.pomodoroMinutes === 'number' ? item.pomodoroMinutes : 0,
+      customMinutes: typeof item.customMinutes === 'number' ? item.customMinutes : 0,
+      pomodoroCount: typeof item.pomodoroCount === 'number' ? item.pomodoroCount : 0,
+      tomatoHarvests: typeof item.tomatoHarvests === 'number' ? item.tomatoHarvests : 0,
+      completedTasks: typeof item.completedTasks === 'number' ? item.completedTasks : 0
+    };
+  }
+
+  // 获取空的统计数据结构
+  private getEmptyPomodoroStats(): PomodoroStatsResponse {
+    return {
+      totalPomodoros: 0,
+      bestDay: {
+        date: '',
+        pomodoroCount: 0,
+        customCount: 0,
+        totalFocusSessions: 0,
+        pomodoroMinutes: 0,
+        customMinutes: 0,
+        totalFocusMinutes: 0,
+        totalBreakMinutes: 0,
+        tomatoHarvests: 0,
+        timeRanges: []
+      },
+      trendData: [],
+      timeDistribution: this.generateEmptyTimeDistribution()
+    };
+  }
+
+  // 生成空的时间分布数据（24小时）
+  private generateEmptyTimeDistribution(): TimeDistribution[] {
+    const result: TimeDistribution[] = [];
+    for (let i = 0; i < 24; i++) {
+      result.push({ hour: i, count: 0 });
+    }
+    return result;
+  }
+
+  // 获取统计摘要数据
+  async getStatsSummary(): Promise<any> {
+    try {
+      if (!App) {
+        console.warn('Wails绑定未找到，无法获取真实数据');
+        // 返回模拟数据
+        return {
+          todayCompletedPomodoros: 5,
+          todayCompletedTasks: 3,
+          todayFocusTime: 7500, // 125分钟
+          weekCompletedPomodoros: 23,
+          weekCompletedTasks: 15,
+          weekFocusTime: 35400 // 590分钟
+        };
+      }
+
+      console.log('获取统计摘要数据');
+
+      // 调用后端API
+      const summaryData = await App.GetStatsSummary();
+      console.log('获取到统计摘要数据:', summaryData);
+
+      return summaryData;
+    } catch (error) {
+      console.error('获取统计摘要数据失败:', error);
+      // 返回默认数据
+      return {
+        todayCompletedPomodoros: 0,
+        todayCompletedTasks: 0,
+        todayFocusTime: 0,
+        weekCompletedPomodoros: 0,
+        weekCompletedTasks: 0,
+        weekFocusTime: 0
+      };
     }
   }
 }

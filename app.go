@@ -127,3 +127,21 @@ func (a *App) GetStatsSummary() (*types.StatSummary, error) {
 	log.Println("获取统计摘要")
 	return a.statController.GetSummary()
 }
+
+// GetDailySummary 获取昨日小结数据
+func (a *App) GetDailySummary() (*types.DailySummaryResponse, error) {
+	log.Println("获取昨日小结数据")
+	return a.statController.GetDailySummary()
+}
+
+// GetEventStats 获取事件统计数据
+func (a *App) GetEventStats(req types.GetStatsRequest) (*types.EventStatsResponse, error) {
+	log.Printf("获取事件统计数据, 开始日期: %s, 结束日期: %s", req.StartDate, req.EndDate)
+	return a.statController.GetEventStats(req)
+}
+
+// GetPomodoroStats 获取番茄统计数据
+func (a *App) GetPomodoroStats(req types.GetStatsRequest) (*types.PomodoroStatsResponse, error) {
+	log.Printf("获取番茄统计数据, 开始日期: %s, 结束日期: %s", req.StartDate, req.EndDate)
+	return a.statController.GetPomodoroStats(req)
+}

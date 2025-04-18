@@ -18,6 +18,18 @@ export function GetAllTodos() {
   return window['go']['main']['App']['GetAllTodos']();
 }
 
+export function GetDailySummary() {
+  return window['go']['main']['App']['GetDailySummary']();
+}
+
+export function GetEventStats(arg1) {
+  return window['go']['main']['App']['GetEventStats'](arg1);
+}
+
+export function GetPomodoroStats(arg1) {
+  return window['go']['main']['App']['GetPomodoroStats'](arg1);
+}
+
 export function GetStats(arg1) {
   return window['go']['main']['App']['GetStats'](arg1);
 }

@@ -13,6 +13,8 @@ type DailyStat struct {
 	PomodoroCount      int    `json:"pomodoro_count"`       // 番茄模式的事件次数
 	CustomCount        int    `json:"custom_count"`         // 自定义模式的事件次数
 	TotalFocusSessions int    `json:"total_focus_sessions"` // 专注事件总数
+	PomodoroMinutes    int    `json:"pomodoro_minutes"`     // 番茄专注总分钟数
+	CustomMinutes      int    `json:"custom_minutes"`       // 自定义专注总分钟数
 	TotalFocusMinutes  int    `json:"total_focus_minutes"`  // 专注总时长（分钟）
 	TotalBreakMinutes  int    `json:"total_break_minutes"`  // 休息总时长（分钟）
 	TomatoHarvests     int    `json:"tomato_harvests"`      // 番茄收成数
@@ -86,7 +88,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	defer rows.Close()
 
 	var pomodoroCount, customCount, totalSessions int
-	var totalFocusMinutes, totalBreakMinutes, tomatoHarvests int
+	var pomodoroMinutes, customMinutes, totalFocusMinutes, totalBreakMinutes, tomatoHarvests int
 	var timeRanges []string
 
 	for rows.Next() {
@@ -102,13 +104,15 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		start, _ := time.Parse(time.RFC3339, startTime)
 		end, _ := time.Parse(time.RFC3339, endTime)
 
-		// 根据模式计数
+		// 根据模式计数和累计分钟数
 		if mode == 0 {
 			pomodoroCount++
+			pomodoroMinutes += duration
 			// 假设每个番茄时间为25分钟
 			tomatoHarvests += duration / 25
 		} else {
 			customCount++
+			customMinutes += duration
 		}
 
 		totalSessions++
@@ -143,6 +147,8 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 				pomodoro_count = ?, 
 				custom_count = ?, 
 				total_focus_sessions = ?,
+				pomodoro_minutes = ?,
+				custom_minutes = ?,
 				total_focus_minutes = ?,
 				total_break_minutes = ?,
 				tomato_harvests = ?,
@@ -152,6 +158,8 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 			pomodoroCount,
 			customCount,
 			totalSessions,
+			pomodoroMinutes,
+			customMinutes,
 			totalFocusMinutes,
 			totalBreakMinutes,
 			tomatoHarvests,
@@ -163,14 +171,17 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		_, err = DB.Exec(`
 			INSERT INTO daily_stats (
 				date, pomodoro_count, custom_count, 
-				total_focus_sessions, total_focus_minutes, total_break_minutes, 
+				total_focus_sessions, pomodoro_minutes, custom_minutes,
+				total_focus_minutes, total_break_minutes,
 				tomato_harvests, time_ranges
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`,
 			date,
 			pomodoroCount,
 			customCount,
 			totalSessions,
+			pomodoroMinutes,
+			customMinutes,
 			totalFocusMinutes,
 			totalBreakMinutes,
 			tomatoHarvests,

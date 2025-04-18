@@ -9,14 +9,15 @@ import (
 
 // Todo 表示待办事项
 type Todo struct {
-	ID                 int64     `json:"id"`
-	Name               string    `json:"name"`
-	Mode               int       `json:"mode"` // 1: pomodoro, 2: custom
-	Status             string    `json:"status"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
-	EstimatedPomodoros int       `json:"estimated_pomodoros"`
-	CustomSettings     string    `json:"custom_settings"` // JSON字符串，存储自定义设置
+	ID                 int64      `json:"id"`
+	Name               string     `json:"name"`
+	Mode               int        `json:"mode"` // 1: pomodoro, 2: custom
+	Status             string     `json:"status"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
+	EstimatedPomodoros int        `json:"estimated_pomodoros"`
+	CustomSettings     string     `json:"custom_settings"` // JSON字符串，存储自定义设置
+	CompletedAt        *time.Time `json:"completed_at"`    // 任务完成时间，未完成时为nil
 }
 
 // TodoRepository 提供对Todo表的操作
@@ -30,7 +31,7 @@ func NewTodoRepository() *TodoRepository {
 // GetAll 获取所有待办事项
 func (r *TodoRepository) GetAll() ([]*Todo, error) {
 	rows, err := DB.Query(`
-		SELECT todo_id, name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings
+		SELECT todo_id, name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings, completed_at
 		FROM todos
 		ORDER BY updated_at DESC
 	`)
@@ -43,6 +44,7 @@ func (r *TodoRepository) GetAll() ([]*Todo, error) {
 	for rows.Next() {
 		var todo Todo
 		var createdAt, updatedAt string
+		var completedAt sql.NullString
 		var customSettings sql.NullString // 使用sql.NullString处理可能为NULL的字段
 
 		err := rows.Scan(
@@ -54,6 +56,7 @@ func (r *TodoRepository) GetAll() ([]*Todo, error) {
 			&updatedAt,
 			&todo.EstimatedPomodoros,
 			&customSettings,
+			&completedAt,
 		)
 		if err != nil {
 			return nil, err
@@ -70,6 +73,16 @@ func (r *TodoRepository) GetAll() ([]*Todo, error) {
 		if err != nil {
 			log.Printf("警告: 解析更新时间出错: %v, 原始值: %s", err, updatedAt)
 			todo.UpdatedAt = time.Now() // 使用当前时间作为后备
+		}
+
+		// 处理完成时间
+		if completedAt.Valid {
+			parsedTime, err := time.Parse(time.RFC3339, completedAt.String)
+			if err != nil {
+				log.Printf("警告: 解析完成时间出错: %v, 原始值: %s", err, completedAt.String)
+			} else {
+				todo.CompletedAt = &parsedTime
+			}
 		}
 
 		// 处理可能为NULL的customSettings
@@ -137,13 +150,24 @@ func (r *TodoRepository) Update(todo *Todo) error {
 // UpdateStatus 更新待办事项状态
 func (r *TodoRepository) UpdateStatus(id int64, status string) error {
 	now := time.Now()
-	_, err := DB.Exec(`
-		UPDATE todos
-		SET status = ?, updated_at = ?
-		WHERE todo_id = ?
-	`, status, now.Format(time.RFC3339), id)
 
-	return err
+	// 如果任务标记为已完成，设置completed_at时间
+	if status == "completed" {
+		_, err := DB.Exec(`
+			UPDATE todos
+			SET status = ?, updated_at = ?, completed_at = ?
+			WHERE todo_id = ?
+		`, status, now.Format(time.RFC3339), now.Format(time.RFC3339), id)
+		return err
+	} else {
+		// 如果任务状态不是已完成，则清除completed_at
+		_, err := DB.Exec(`
+			UPDATE todos
+			SET status = ?, updated_at = ?, completed_at = NULL
+			WHERE todo_id = ?
+		`, status, now.Format(time.RFC3339), id)
+		return err
+	}
 }
 
 // Delete 删除待办事项
@@ -156,10 +180,11 @@ func (r *TodoRepository) Delete(id int64) error {
 func (r *TodoRepository) GetByID(id int64) (*Todo, error) {
 	var todo Todo
 	var createdAt, updatedAt string
+	var completedAt sql.NullString
 	var customSettings sql.NullString // 使用sql.NullString处理可能为NULL的字段
 
 	err := DB.QueryRow(`
-		SELECT todo_id, name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings
+		SELECT todo_id, name, mode, status, created_at, updated_at, estimated_pomodoros, custom_settings, completed_at
 		FROM todos
 		WHERE todo_id = ?
 	`, id).Scan(
@@ -171,6 +196,7 @@ func (r *TodoRepository) GetByID(id int64) (*Todo, error) {
 		&updatedAt,
 		&todo.EstimatedPomodoros,
 		&customSettings,
+		&completedAt,
 	)
 
 	if err != nil {
@@ -188,6 +214,16 @@ func (r *TodoRepository) GetByID(id int64) (*Todo, error) {
 	if err != nil {
 		log.Printf("警告: 解析更新时间出错: %v, 原始值: %s", err, updatedAt)
 		todo.UpdatedAt = time.Now() // 使用当前时间作为后备
+	}
+
+	// 处理完成时间
+	if completedAt.Valid {
+		parsedTime, err := time.Parse(time.RFC3339, completedAt.String)
+		if err != nil {
+			log.Printf("警告: 解析完成时间出错: %v, 原始值: %s", err, completedAt.String)
+		} else {
+			todo.CompletedAt = &parsedTime
+		}
 	}
 
 	// 处理可能为NULL的customSettings

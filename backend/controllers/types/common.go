@@ -86,6 +86,8 @@ type StatResponse struct {
 	PomodoroCount      int      `json:"pomodoro_count"`
 	CustomCount        int      `json:"custom_count"`
 	TotalFocusSessions int      `json:"total_focus_sessions"`
+	PomodoroMinutes    int      `json:"pomodoro_minutes"`
+	CustomMinutes      int      `json:"custom_minutes"`
 	TotalFocusMinutes  int      `json:"total_focus_minutes"`
 	TotalBreakMinutes  int      `json:"total_break_minutes"`
 	TomatoHarvests     int      `json:"tomato_harvests"`
