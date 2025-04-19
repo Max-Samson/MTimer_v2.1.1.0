@@ -136,7 +136,8 @@ func (a *App) GetDailySummary() (*types.DailySummaryResponse, error) {
 
 // GetEventStats 获取事件统计数据
 func (a *App) GetEventStats(req types.GetStatsRequest) (*types.EventStatsResponse, error) {
-	log.Printf("获取事件统计数据, 开始日期: %s, 结束日期: %s", req.StartDate, req.EndDate)
+	log.Println("获取事件统计数据:", req)
+	// 调用统计控制器获取事件统计数据
 	return a.statController.GetEventStats(req)
 }
 

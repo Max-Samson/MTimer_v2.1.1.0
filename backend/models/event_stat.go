@@ -94,6 +94,18 @@ func (r *EventStatRepository) UpdateEventStats(todoID int64, date string) error 
 
 // GetEventStatsByDateRange 获取指定日期范围内的任务统计数据
 func (r *EventStatRepository) GetEventStatsByDateRange(startDate, endDate string) ([]EventStat, error) {
+	// 调试函数，打印当前数据库中的所有事件统计记录
+	r.debugPrintAllEventStats()
+
+	// 查询实际的待办事项总数
+	var totalTodos int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM todos`).Scan(&totalTodos)
+	if err != nil {
+		fmt.Printf("获取待办事项总数失败: %v\n", err)
+	} else {
+		fmt.Printf("数据库中实际的待办事项总数: %d\n", totalTodos)
+	}
+
 	rows, err := DB.Query(`
 		SELECT event_id, date, focus_count, total_focus_time, mode, completed
 		FROM event_stats
@@ -125,7 +137,80 @@ func (r *EventStatRepository) GetEventStatsByDateRange(startDate, endDate string
 		stats = append(stats, stat)
 	}
 
+	// 记录返回的结果条数
+	fmt.Printf("查询到 %d 条事件统计记录，日期范围: %s - %s\n", len(stats), startDate, endDate)
 	return stats, nil
+}
+
+// debugPrintAllEventStats 打印所有事件统计记录的调试函数
+func (r *EventStatRepository) debugPrintAllEventStats() {
+	fmt.Println("===== 调试: 打印所有事件统计记录 =====")
+
+	// 获取表中记录总数
+	var count int
+	err := DB.QueryRow("SELECT COUNT(*) FROM event_stats").Scan(&count)
+	if err != nil {
+		fmt.Printf("获取记录总数失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("事件统计表中共有 %d 条记录\n", count)
+
+	if count == 0 {
+		fmt.Println("事件统计表为空，请先完成一些任务记录")
+		return
+	}
+
+	// 限制只打印最多10条记录，避免日志过多
+	rows, err := DB.Query(`
+		SELECT event_id, date, focus_count, total_focus_time, mode, completed
+		FROM event_stats
+		ORDER BY date DESC, event_id ASC
+		LIMIT 10
+	`)
+
+	if err != nil {
+		fmt.Printf("查询记录失败: %v\n", err)
+		return
+	}
+	defer rows.Close()
+
+	fmt.Println("最近10条事件统计记录:")
+	fmt.Println("ID\t日期\t\t专注次数\t总时长(分钟)\t模式\t是否完成")
+	fmt.Println("--------------------------------------------------------------------")
+
+	for rows.Next() {
+		var stat EventStat
+		err := rows.Scan(
+			&stat.EventID,
+			&stat.Date,
+			&stat.FocusCount,
+			&stat.TotalFocusTime,
+			&stat.Mode,
+			&stat.Completed,
+		)
+
+		if err != nil {
+			fmt.Printf("扫描记录失败: %v\n", err)
+			continue
+		}
+
+		// 输出记录信息
+		modeStr := "自定义"
+		if stat.Mode == 1 {
+			modeStr = "番茄"
+		}
+
+		completedStr := "否"
+		if stat.Completed {
+			completedStr = "是"
+		}
+
+		fmt.Printf("%d\t%s\t%d\t\t%d\t\t%s\t%s\n",
+			stat.EventID, stat.Date, stat.FocusCount, stat.TotalFocusTime, modeStr, completedStr)
+	}
+
+	fmt.Println("===== 调试结束 =====")
 }
 
 // GetEventStatsForTodo 获取指定任务的统计数据
@@ -166,13 +251,18 @@ func (r *EventStatRepository) GetEventStatsForTodo(todoID int64, startDate, endD
 
 // GetCompletionStats 获取指定日期范围内的完成率统计
 func (r *EventStatRepository) GetCompletionStats(startDate, endDate string) (map[string]interface{}, error) {
-	// 查询指定时间段内的任务完成情况
+	// 查询实际的待办事项总数（所有存在的待办事项）
+	var totalTodos int
+	err := DB.QueryRow(`SELECT COUNT(*) FROM todos`).Scan(&totalTodos)
+	if err != nil {
+		return nil, fmt.Errorf("获取待办事项总数失败: %w", err)
+	}
+
+	// 从event_stats表中查询已完成的待办事项数量
 	rows, err := DB.Query(`
-		SELECT
-			COUNT(DISTINCT event_id) as total_events,
-			SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END) as completed_events
+		SELECT COUNT(DISTINCT event_id) as completed_events
 		FROM event_stats
-		WHERE date BETWEEN ? AND ?
+		WHERE completed = 1 AND date BETWEEN ? AND ?
 	`, startDate, endDate)
 
 	if err != nil {
@@ -180,9 +270,9 @@ func (r *EventStatRepository) GetCompletionStats(startDate, endDate string) (map
 	}
 	defer rows.Close()
 
-	var totalEvents, completedEvents int
+	var completedEvents int
 	if rows.Next() {
-		err := rows.Scan(&totalEvents, &completedEvents)
+		err := rows.Scan(&completedEvents)
 		if err != nil {
 			return nil, err
 		}
@@ -190,12 +280,12 @@ func (r *EventStatRepository) GetCompletionStats(startDate, endDate string) (map
 
 	// 计算完成率
 	completionRate := 0.0
-	if totalEvents > 0 {
-		completionRate = float64(completedEvents) / float64(totalEvents) * 100
+	if totalTodos > 0 {
+		completionRate = float64(completedEvents) / float64(totalTodos) * 100
 	}
 
 	return map[string]interface{}{
-		"total_events":     totalEvents,
+		"total_events":     totalTodos,
 		"completed_events": completedEvents,
 		"completion_rate":  fmt.Sprintf("%.2f", completionRate),
 	}, nil

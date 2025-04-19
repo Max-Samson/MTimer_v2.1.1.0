@@ -537,12 +537,75 @@ class DatabaseService {
     }
   }
 
-  // 获取事件统计数据
+  private mockEventStatsCache: EventStatsResponse | null = null;
+  private lastRefreshTime = 0;
+  private minRefreshInterval = 60000; // 最小刷新间隔为1分钟
+
   async getEventStats(startDate: string, endDate: string): Promise<EventStatsResponse> {
+    console.log(`开始获取事件统计数据，时间范围：${startDate} - ${endDate}`);
+
+    // 更新最后刷新时间
+    this.lastRefreshTime = Date.now();
+
     try {
+      // 检查App绑定是否存在
       if (!App) {
-        console.warn('Wails绑定未找到，无法获取真实数据');
-        // 返回空数据结构
+        console.warn("App绑定不存在，使用模拟数据");
+        console.log("生成模拟事件统计数据");
+        return this.generateFixedMockEventStats(startDate, endDate);
+      }
+
+      // 获取真实数据
+      console.log("尝试从后端API获取事件统计数据...");
+      // 兼容性处理：如果没有直接的GetEventStats API，则使用GetStats API代替
+      let response: any;
+
+      try {
+        // 通过类型断言解决TypeScript类型检查问题
+        const appAny = App as any;
+        console.log("调用GetEventStats API...");
+        response = await appAny.GetEventStats({
+          start_date: startDate,
+          end_date: endDate
+        });
+        console.log("GetEventStats API返回结果:", response);
+      } catch (err) {
+        console.warn("GetEventStats API调用失败:", err);
+        console.log("尝试调用GetStats API作为替代...");
+
+        try {
+          const statsData = await App.GetStats({
+            start_date: startDate,
+            end_date: endDate
+          });
+          console.log("GetStats API返回结果:", statsData);
+
+          if (!statsData || !Array.isArray(statsData)) {
+            console.warn("GetStats API返回无效数据");
+            throw new Error("无法获取统计数据");
+          }
+
+          // 构造兼容的响应对象
+          response = {
+            total_events: 0,
+            completed_events: 0,
+            completion_rate: "0%",
+            trend_data: statsData.map((stat: any) => ({
+              date: stat.date,
+              total_focus_minutes: stat.total_focus_minutes || 0
+            }))
+          };
+        } catch (statsErr) {
+          console.error("GetStats API调用也失败:", statsErr);
+          throw new Error("所有API调用失败");
+        }
+      }
+
+      console.log('从后端获取的事件统计数据:', JSON.stringify(response));
+
+      // 确保响应数据有效
+      if (!response) {
+        console.warn('后端返回的事件统计数据为空');
         return {
           totalEvents: 0,
           completedEvents: 0,
@@ -551,58 +614,32 @@ class DatabaseService {
         };
       }
 
-      console.log(`获取事件统计数据: ${startDate} 至 ${endDate}`);
+      // 转换数据格式（如果需要）确保前端接收到的数据格式正确
+      const result: EventStatsResponse = {
+        totalEvents: typeof response.total_events === 'number' ? response.total_events : 0,
+        completedEvents: typeof response.completed_events === 'number' ? response.completed_events : 0,
+        completionRate: typeof response.completion_rate === 'string' ? response.completion_rate : '0%',
+        trendData: Array.isArray(response.trend_data)
+          ? response.trend_data.map((item: any) => ({
+              date: item.date || new Date().toISOString().split('T')[0],
+              totalFocusMinutes: typeof item.total_focus_minutes === 'number' ? item.total_focus_minutes : 0
+            }))
+          : []
+      };
 
-      // 使用现有的GetStats API获取数据
-      const statsData = await App.GetStats({
-        start_date: startDate,
-        end_date: endDate
-      });
+      console.log('转换后的数据:', JSON.stringify(result));
 
-      console.log('获取到统计数据:', statsData);
-
-      // 从后端数据构建事件统计
-      const stats = statsData.map((stat: any) => ({
-        date: stat.date,
-        totalFocusMinutes: stat.total_focus_minutes || 0
-      }));
-
-      // 获取总事件数据，这里从待办事项获取
-      let totalEvents = 0;
-      let completedEvents = 0;
-
-      // 尝试获取所有待办事项
-      try {
-        const todos = await App.GetAllTodos();
-
-        // 过滤在日期范围内的待办事项
-        const filteredTodos = todos.filter((todo: any) => {
-          const createdTimestamp = todo.created_at;
-          if (!createdTimestamp) return false;
-
-          const createdDate = new Date(createdTimestamp * 1000).toISOString().split('T')[0];
-          return createdDate >= startDate && createdDate <= endDate;
-        });
-
-        totalEvents = filteredTodos.length;
-        completedEvents = filteredTodos.filter((todo: any) => todo.status === 'completed').length;
-      } catch (err) {
-        console.error('获取待办事项失败:', err);
+      // 显式检查数据有效性
+      if (result.totalEvents === 0 && (!result.trendData || result.trendData.length === 0)) {
+        console.log('转换后的数据为空，可能需要显示"暂无数据"');
       }
 
-      const completionRate = totalEvents > 0
-        ? ((completedEvents / totalEvents) * 100).toFixed(1) + '%'
-        : '0%';
-
-      return {
-        totalEvents,
-        completedEvents,
-        completionRate,
-        trendData: stats
-      };
+      return result;
     } catch (error) {
-      console.error('获取事件统计数据失败:', error);
-      // 返回空数据
+      console.error("获取事件统计数据时出错:", error);
+
+      console.log("由于错误，返回空数据结构");
+      // 出错时返回空数据结构，确保UI可以正确显示"暂无数据"
       return {
         totalEvents: 0,
         completedEvents: 0,
@@ -610,6 +647,59 @@ class DatabaseService {
         trendData: []
       };
     }
+  }
+
+  // 生成固定的模拟事件统计数据
+  private generateFixedMockEventStats(startDate: string, endDate: string): EventStatsResponse {
+    console.log('生成固定的模拟事件统计数据');
+    // 计算日期范围内的天数
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const dayCount = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+    // 生成趋势数据，使用日期作为种子确保每次生成的数据一致
+    const trendData: DailyTrendData[] = [];
+
+    // 固定的事件总数和完成数
+    const totalEvents = 15;
+    const completedEvents = 8;
+
+    for (let i = 0; i < dayCount; i++) {
+      const currentDate = new Date(start);
+      currentDate.setDate(start.getDate() + i);
+      const dateString = currentDate.toISOString().split('T')[0];
+
+      // 将日期字符串转换为数字，用作种子
+      const dateSeed = parseInt(dateString.replace(/-/g, ''));
+
+      // 使用日期作为种子生成固定的随机值
+      const focusMinutes = this.getSeededRandom(dateSeed, 60, 180);
+
+      trendData.push({
+        date: dateString,
+        totalFocusMinutes: focusMinutes
+      });
+    }
+
+    // 按日期排序
+    trendData.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return {
+      totalEvents,
+      completedEvents,
+      completionRate: '53.3%', // 固定的完成率
+      trendData
+    };
+  }
+
+  // 使用种子生成伪随机数
+  private getSeededRandom(seed: number, min: number, max: number): number {
+    // 简单的伪随机数生成器
+    const x = Math.sin(seed) * 10000;
+    const randomValue = (x - Math.floor(x));
+
+    // 映射到指定范围
+    return Math.floor(min + randomValue * (max - min + 1));
   }
 
   // 获取番茄统计数据
@@ -818,3 +908,4 @@ class DatabaseService {
 // 创建单例实例
 const dbService = new DatabaseService()
 export default dbService
+

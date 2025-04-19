@@ -3,6 +3,7 @@ package controllers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"MTimer/backend/controllers/types"
@@ -236,27 +237,49 @@ func (c *StatsController) GetDailySummary() (*types.DailySummaryResponse, error)
 
 // GetEventStats 获取事件统计数据
 func (c *StatsController) GetEventStats(req types.GetStatsRequest) (*types.EventStatsResponse, error) {
+	log.Printf("GetEventStats被调用，时间范围: %s 至 %s", req.StartDate, req.EndDate)
+
 	// 验证日期格式
 	if req.StartDate == "" {
 		// 默认为过去7天
 		req.StartDate = time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+		log.Printf("未提供起始日期，使用默认值: %s", req.StartDate)
 	}
 
 	if req.EndDate == "" {
 		// 默认为今天
 		req.EndDate = time.Now().Format("2006-01-02")
+		log.Printf("未提供结束日期，使用默认值: %s", req.EndDate)
 	}
+
+	log.Printf("开始从数据库获取事件统计数据，日期范围: %s 至 %s", req.StartDate, req.EndDate)
 
 	// 获取时间段内的事件统计
 	eventStats, err := c.eventStatRepo.GetEventStatsByDateRange(req.StartDate, req.EndDate)
 	if err != nil {
-		return nil, err
+		log.Printf("获取事件统计出错: %v", err)
+		// 返回空数据而不是错误
+		return &types.EventStatsResponse{
+			TotalEvents:     0,
+			CompletedEvents: 0,
+			CompletionRate:  "0%",
+			TrendData:       []types.DailyTrendData{},
+		}, nil
 	}
+
+	log.Printf("从数据库获取到 %d 条事件统计记录", len(eventStats))
 
 	// 获取完成率统计
 	completionStats, err := c.eventStatRepo.GetCompletionStats(req.StartDate, req.EndDate)
 	if err != nil {
-		return nil, err
+		log.Printf("获取完成率统计出错: %v", err)
+		// 返回空数据而不是错误
+		return &types.EventStatsResponse{
+			TotalEvents:     0,
+			CompletedEvents: 0,
+			CompletionRate:  "0%",
+			TrendData:       []types.DailyTrendData{},
+		}, nil
 	}
 
 	// 按日期聚合工作量趋势
@@ -273,12 +296,45 @@ func (c *StatsController) GetEventStats(req types.GetStatsRequest) (*types.Event
 		})
 	}
 
-	return &types.EventStatsResponse{
-		TotalEvents:     completionStats["total_events"].(int),
-		CompletedEvents: completionStats["completed_events"].(int),
-		CompletionRate:  completionStats["completion_rate"].(string),
+	log.Printf("生成了 %d 个日期的趋势数据", len(trendData))
+
+	// 如果completionStats为空，设置默认值
+	totalEvents := 0
+	completedEvents := 0
+	completionRate := "0%"
+
+	if val, ok := completionStats["total_events"]; ok && val != nil {
+		totalEvents = val.(int)
+	}
+
+	if val, ok := completionStats["completed_events"]; ok && val != nil {
+		completedEvents = val.(int)
+	}
+
+	if val, ok := completionStats["completion_rate"]; ok && val != nil {
+		completionRate = val.(string)
+	}
+
+	// 如果没有数据，日志记录这个情况
+	if totalEvents == 0 && len(trendData) == 0 {
+		log.Printf("没有找到任何事件统计数据，返回空响应")
+	} else {
+		log.Printf("事件统计: 总事件=%d, 已完成=%d, 完成率=%s, 趋势数据条数=%d",
+			totalEvents, completedEvents, completionRate, len(trendData))
+	}
+
+	response := &types.EventStatsResponse{
+		TotalEvents:     totalEvents,
+		CompletedEvents: completedEvents,
+		CompletionRate:  completionRate,
 		TrendData:       trendData,
-	}, nil
+	}
+
+	// 将响应对象记录到日志，方便调试
+	responseJSON, _ := json.Marshal(response)
+	log.Printf("EventStats响应: %s", string(responseJSON))
+
+	return response, nil
 }
 
 // GetPomodoroStats 获取番茄统计数据

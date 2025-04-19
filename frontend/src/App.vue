@@ -8,6 +8,30 @@ import AudioInitializer from './components/AudioInitializer.vue'
 const theme = ref<typeof darkTheme | null>(null)
 const osThemeRef = useOsTheme()
 
+// 全局数据状态
+const globalDataState = ref({
+  isLoading: false,
+  lastRefreshTime: 0,
+  hasError: false,
+  errorMessage: ''
+})
+
+// 提供全局数据状态管理方法
+provide('setGlobalLoading', (loading: boolean) => {
+  globalDataState.value.isLoading = loading
+})
+
+provide('setGlobalError', (message: string) => {
+  globalDataState.value.hasError = !!message
+  globalDataState.value.errorMessage = message
+})
+
+provide('updateLastRefreshTime', () => {
+  globalDataState.value.lastRefreshTime = Date.now()
+})
+
+provide('getDataState', () => globalDataState.value)
+
 // 提供主题状态给子组件
 provide('theme', theme)
 
