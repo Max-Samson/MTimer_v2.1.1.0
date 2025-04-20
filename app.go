@@ -14,6 +14,7 @@ type App struct {
 	ctx            context.Context
 	todoController *controllers.TodoController
 	statController *controllers.StatsController
+	aiController   *controllers.AIController
 }
 
 // NewApp creates a new App application struct
@@ -37,6 +38,7 @@ func (a *App) startup(ctx context.Context) {
 	// 初始化控制器
 	a.todoController = controllers.NewTodoController()
 	a.statController = controllers.NewStatsController()
+	a.aiController = controllers.NewAIController()
 
 	log.Println("应用启动成功")
 }
@@ -145,4 +147,10 @@ func (a *App) GetEventStats(req types.GetStatsRequest) (*types.EventStatsRespons
 func (a *App) GetPomodoroStats(req types.GetStatsRequest) (*types.PomodoroStatsResponse, error) {
 	log.Printf("获取番茄统计数据, 开始日期: %s, 结束日期: %s", req.StartDate, req.EndDate)
 	return a.statController.GetPomodoroStats(req)
+}
+
+// CallDeepSeekAPI 调用DeepSeek API
+func (a *App) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.DeepSeekAPIResponse, error) {
+	log.Printf("调用DeepSeek API, 消息数量: %d", len(req.Messages))
+	return a.aiController.CallDeepSeekAPI(req)
 }

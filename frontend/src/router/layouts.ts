@@ -26,6 +26,11 @@ export const mainLayoutRoutes: RouteRecordRaw[] = [
         path: '/settings',
         name: 'settings',
         component: () => import('../views/SettingsView.vue')
+      },
+      {
+        path: '/ai-assistant',
+        name: 'ai-assistant',
+        component: () => import('../views/AIAssistantView.vue')
       }
     ]
   }

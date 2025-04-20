@@ -118,15 +118,63 @@ const fetchData = async () => {
     const summaryData = await dbService.getStatsSummary();
     if (summaryData) {
       summary.value = summaryData;
+      console.log('摘要数据加载成功:', JSON.stringify(summary.value));
+    } else {
+      console.warn('摘要数据为空');
     }
 
     // 获取周趋势数据
+    console.log('开始获取周趋势数据...');
     const trendData = await dbService.getDailySummary();
-    if (trendData && trendData.weekTrend && trendData.weekTrend.length > 0) {
-      weekTrend.value = trendData.weekTrend;
+    console.log('DailySummary 组件收到的周趋势数据:', JSON.stringify(trendData));
+
+    // 验证weekTrend属性
+    if (!trendData || !trendData.weekTrend) {
+      console.warn('周趋势数据无效或为空');
+      weekTrend.value = [];
+    } else if (!Array.isArray(trendData.weekTrend)) {
+      console.warn('周趋势数据不是数组', trendData.weekTrend);
+      weekTrend.value = [];
+    } else if (trendData.weekTrend.length === 0) {
+      console.warn('周趋势数据数组为空');
+      weekTrend.value = [];
+    } else {
+      console.log(`获取到 ${trendData.weekTrend.length} 天的趋势数据`);
+
+      // 标准化每一天的数据，确保所有必要的字段都存在且类型正确
+      weekTrend.value = trendData.weekTrend.map(item => {
+        // 创建新对象，避免直接修改原始数据
+        const normalizedItem = {
+          date: item.date || '',
+          totalFocusMinutes: typeof item.totalFocusMinutes === 'number' ? item.totalFocusMinutes : 0,
+          pomodoroMinutes: typeof item.pomodoroMinutes === 'number' ? item.pomodoroMinutes : 0,
+          customMinutes: typeof item.customMinutes === 'number' ? item.customMinutes : 0,
+          pomodoroCount: typeof item.pomodoroCount === 'number' ? item.pomodoroCount : 0,
+          tomatoHarvests: typeof item.tomatoHarvests === 'number' ? item.tomatoHarvests : 0,
+          completedTasks: typeof item.completedTasks === 'number' ? item.completedTasks : 0
+        };
+
+        // 记录每天的专注分钟数，方便调试
+        console.log(`日期 ${normalizedItem.date} 的专注时长: ${normalizedItem.totalFocusMinutes}分钟`);
+
+        return normalizedItem;
+      });
+
+      console.log('处理后的周趋势数据:', JSON.stringify(weekTrend.value));
+
+      // 验证处理后的数据是否有效
+      const hasValidData = weekTrend.value.some(item =>
+        (item.totalFocusMinutes ?? 0) > 0 ||
+        (item.pomodoroCount ?? 0) > 0 ||
+        (item.completedTasks ?? 0) > 0
+      );
+      if (!hasValidData) {
+        console.warn('处理后的趋势数据没有有效值，图表可能显示为空');
+      }
     }
   } catch (error) {
     console.error('获取统计数据失败:', error);
+    weekTrend.value = []; // 错误时重置数据
   } finally {
     loading.value = false;
   }

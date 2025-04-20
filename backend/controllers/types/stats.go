@@ -8,6 +8,7 @@ type DailyTrendData struct {
 	CustomMinutes     int    `json:"custom_minutes,omitempty"`
 	PomodoroCount     int    `json:"pomodoro_count,omitempty"`
 	TomatoHarvests    int    `json:"tomato_harvests,omitempty"`
+	CompletedTasks    int    `json:"completed_tasks,omitempty"`
 }
 
 // TimeDistribution 表示时间分布数据

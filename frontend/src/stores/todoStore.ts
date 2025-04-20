@@ -345,6 +345,25 @@ export const useTodoStore = defineStore('todo', () => {
   // 设置待办事项状态
   const setTodoStatus = async (id: number, status: TodoStatus) => {
     try {
+      // 如果要设置为进行中状态，先检查是否有其他事件正在进行
+      if (status === 'inProgress') {
+        // 查找是否已有其他任务处于进行中状态
+        const existingInProgressTodo = todos.value.find(t => t.status === 'inProgress' && t.id !== id);
+
+        if (existingInProgressTodo) {
+          // 存在其他正在进行中的任务，先将其重置为待处理状态
+          console.log(`发现其他进行中的任务(ID:${existingInProgressTodo.id})，将其重置为待处理状态`);
+          // 更新数据库中的状态
+          await dbService.updateTodoStatus(existingInProgressTodo.id, 'pending');
+          // 更新本地数据
+          existingInProgressTodo.status = 'pending';
+          // 如果当前任务就是该任务，重置当前任务
+          if (currentTodo.value && currentTodo.value.id === existingInProgressTodo.id) {
+            currentTodo.value = null;
+          }
+        }
+      }
+
       const success = await dbService.updateTodoStatus(id, status)
       if (success) {
         // 直接更新本地数据，而不是重新加载全部数据
@@ -375,9 +394,12 @@ export const useTodoStore = defineStore('todo', () => {
             todo.completedAt = null
           }
 
-          // 如果是设置为进行中状态，更新时间戳
+          // 如果是设置为进行中状态，更新时间戳并设置为当前任务
           if (status === 'inProgress') {
             todo.lastFocusTimestamp = Date.now()
+            // 设置为当前任务
+            currentTodo.value = todo;
+            console.log(`待办事项(ID:${id})设置为当前进行中任务`);
           }
 
           // 更新完成任务统计
@@ -392,6 +414,16 @@ export const useTodoStore = defineStore('todo', () => {
   // 开始专注会话
   const startFocusSession = async (id: number, mode: 'pomodoro' | 'custom') => {
     try {
+      // 先检查是否有其他任务在进行中
+      const existingInProgressTodo = todos.value.find(t => t.status === 'inProgress' && t.id !== id);
+      if (existingInProgressTodo) {
+        console.log(`开始新的专注会话前，将其他进行中的任务(ID:${existingInProgressTodo.id})重置为待处理状态`);
+        // 更新该任务状态为待处理
+        await dbService.updateTodoStatus(existingInProgressTodo.id, 'pending');
+        // 更新本地状态
+        existingInProgressTodo.status = 'pending';
+      }
+
       const sessionId = await dbService.startFocusSession(id, mode)
       currentSessionId.value = sessionId
 

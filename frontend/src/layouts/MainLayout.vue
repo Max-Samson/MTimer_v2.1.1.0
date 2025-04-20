@@ -7,9 +7,10 @@ import TodoList from '../components/TodoList.vue'
 import Navigation from '../components/Navigation.vue'
 import SettingsView from '../views/SettingsView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
+import AIAssistantView from '../views/AIAssistantView.vue'
 import MusicPlayer from '../components/MusicPlayer.vue'
 import MiniMusicController from '../components/MiniMusicController.vue'
-import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task } from '@vicons/carbon'
+import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task, Rocket } from '@vicons/carbon'
 import { useSettingsStore, useTimerStore, useTodoStore } from '../stores'
 import { storeToRefs } from 'pinia'
 
@@ -38,6 +39,11 @@ const tabs = [
         name: 'stats',
         label: '数据统计',
         icon: () => h(ChartLine),
+    },
+    {
+        name: 'ai',
+        label: 'AI助手',
+        icon: () => h(Rocket),
     }
 ]
 
@@ -256,6 +262,17 @@ const changeTimerMode = (key: string) => {
                                 </div>
                             </template>
                             <statistics-view />
+                        </n-tab-pane>
+                        <n-tab-pane name="ai">
+                            <template #tab>
+                                <div class="tab-item">
+                                    <n-icon size="18">
+                                        <Rocket />
+                                    </n-icon>
+                                    <span class="tab-label">AI助手</span>
+                                </div>
+                            </template>
+                            <ai-assistant-view />
                         </n-tab-pane>
                     </n-tabs>
                 </div>

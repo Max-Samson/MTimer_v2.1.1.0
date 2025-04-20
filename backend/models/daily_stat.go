@@ -32,12 +32,12 @@ func NewDailyStatRepository() *DailyStatRepository {
 // GetByDateRange 获取指定日期范围内的统计数据
 func (r *DailyStatRepository) GetByDateRange(startDate, endDate string) ([]DailyStat, error) {
 	rows, err := DB.Query(`
-		SELECT 
-			stat_id, date, pomodoro_count, custom_count, 
-			total_focus_sessions, total_focus_minutes, total_break_minutes, 
-			tomato_harvests, time_ranges 
-		FROM daily_stats 
-		WHERE date BETWEEN ? AND ? 
+		SELECT
+			stat_id, date, pomodoro_count, custom_count,
+			total_focus_sessions, total_focus_minutes, total_break_minutes,
+			tomato_harvests, time_ranges
+		FROM daily_stats
+		WHERE date BETWEEN ? AND ?
 		ORDER BY date ASC
 	`, startDate, endDate)
 
@@ -76,9 +76,9 @@ func (r *DailyStatRepository) GetByDateRange(startDate, endDate string) ([]Daily
 func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	// 获取指定日期的所有专注会话
 	rows, err := DB.Query(`
-		SELECT 
+		SELECT
 			start_time, end_time, break_time, duration, mode
-		FROM focus_sessions 
+		FROM focus_sessions
 		WHERE DATE(start_time) = ? AND end_time IS NOT NULL
 	`, date)
 
@@ -142,10 +142,10 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	if count > 0 {
 		// 更新现有记录
 		_, err = DB.Exec(`
-			UPDATE daily_stats 
-			SET 
-				pomodoro_count = ?, 
-				custom_count = ?, 
+			UPDATE daily_stats
+			SET
+				pomodoro_count = ?,
+				custom_count = ?,
 				total_focus_sessions = ?,
 				pomodoro_minutes = ?,
 				custom_minutes = ?,
@@ -170,7 +170,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		// 插入新记录
 		_, err = DB.Exec(`
 			INSERT INTO daily_stats (
-				date, pomodoro_count, custom_count, 
+				date, pomodoro_count, custom_count,
 				total_focus_sessions, pomodoro_minutes, custom_minutes,
 				total_focus_minutes, total_break_minutes,
 				tomato_harvests, time_ranges

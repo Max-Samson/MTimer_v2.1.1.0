@@ -148,6 +148,7 @@ export namespace types {
 	    custom_minutes?: number;
 	    pomodoro_count?: number;
 	    tomato_harvests?: number;
+	    completed_tasks?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new DailyTrendData(source);
@@ -161,6 +162,7 @@ export namespace types {
 	        this.custom_minutes = source["custom_minutes"];
 	        this.pomodoro_count = source["pomodoro_count"];
 	        this.tomato_harvests = source["tomato_harvests"];
+	        this.completed_tasks = source["completed_tasks"];
 	    }
 	}
 	export class StatResponse {

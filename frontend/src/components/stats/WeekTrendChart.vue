@@ -63,6 +63,9 @@ const initChart = () => {
 const updateChart = () => {
   if (!chartInstance || !props.weekData || props.weekData.length === 0) return;
 
+  // 添加调试信息以确认数据
+  console.log('WeekTrendChart 收到的原始数据:', JSON.stringify(props.weekData));
+
   // 格式化日期
   const dates = props.weekData.map(item => {
     const dateParts = item.date.split('-');
@@ -72,13 +75,57 @@ const updateChart = () => {
     return item.date;
   });
 
-  // 提取数据
-  // 将分钟转换为小时，保留一位小数以提高可读性
-  const focusTimeData = props.weekData.map(item =>
-    item.totalFocusMinutes ? parseFloat((item.totalFocusMinutes / 60).toFixed(1)) : 0
-  );
-  const pomodorosData = props.weekData.map(item => item.pomodoroCount || 0);
-  const tasksData = props.weekData.map(item => item.completedTasks || 0);
+  // 提取专注时长数据，确保数值有效
+  const focusTimeData = props.weekData.map(item => {
+    // 确保totalFocusMinutes是有效的数字
+    let minutes = 0;
+    if (typeof item.totalFocusMinutes === 'number' && !isNaN(item.totalFocusMinutes)) {
+      minutes = item.totalFocusMinutes;
+    }
+
+    // 确保数据不为负数
+    minutes = Math.max(0, minutes);
+
+    console.log(`日期 ${item.date} 的专注时长: ${minutes}分钟`);
+
+    // 将分钟转换为小时，保留一位小数以提高可读性
+    return parseFloat((minutes / 60).toFixed(1));
+  });
+
+  // 提取番茄数据，确保数值有效
+  const pomodorosData = props.weekData.map(item => {
+    let count = 0;
+    if (typeof item.pomodoroCount === 'number' && !isNaN(item.pomodoroCount)) {
+      count = Math.max(0, item.pomodoroCount); // 确保不为负数
+    }
+    return count;
+  });
+
+  // 提取完成任务数据，确保数值有效
+  const tasksData = props.weekData.map(item => {
+    let count = 0;
+    if (typeof item.completedTasks === 'number' && !isNaN(item.completedTasks)) {
+      count = Math.max(0, item.completedTasks); // 确保不为负数
+    }
+    console.log(`日期 ${item.date} 的完成任务数: ${count}`);
+    return count;
+  });
+
+  console.log('处理后的图表数据:', {
+    dates,
+    focusTimeData,
+    pomodorosData,
+    tasksData
+  });
+
+  // 检查是否所有数据都为0，如果是则显示提示信息
+  const allZero = focusTimeData.every(v => v === 0) &&
+                pomodorosData.every(v => v === 0) &&
+                tasksData.every(v => v === 0);
+
+  if (allZero) {
+    console.warn('所有数据都为0，图表可能显示为空');
+  }
 
   // 计算合适的最大值，确保数据在图表上显示得更清晰
   const maxFocusTime = Math.max(...focusTimeData, 1); // 至少为1

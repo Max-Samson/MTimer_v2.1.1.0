@@ -221,11 +221,26 @@ func (c *StatsController) GetDailySummary() (*types.DailySummaryResponse, error)
 	// 构建每日趋势数据
 	var trendData []types.DailyTrendData
 	for _, stat := range weekStats {
+		// 获取该日期完成的任务数
+		completedTasks := 0
+		err := models.DB.QueryRow(`
+			SELECT COUNT(DISTINCT event_id)
+			FROM event_stats
+			WHERE date = ? AND completed = 1
+		`, stat.Date).Scan(&completedTasks)
+
+		if err != nil {
+			log.Printf("获取 %s 完成任务数失败: %v", stat.Date, err)
+		}
+
 		trendData = append(trendData, types.DailyTrendData{
 			Date:              stat.Date,
 			TotalFocusMinutes: stat.TotalFocusMinutes,
 			PomodoroMinutes:   stat.PomodoroMinutes,
 			CustomMinutes:     stat.CustomMinutes,
+			PomodoroCount:     stat.PomodoroCount,
+			TomatoHarvests:    stat.TomatoHarvests,
+			CompletedTasks:    completedTasks,
 		})
 	}
 

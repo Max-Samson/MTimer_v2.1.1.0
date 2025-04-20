@@ -7,7 +7,8 @@ import {
     ChartColumn,
     List,
     ArrowLeft,
-    ArrowRight
+    ArrowRight,
+    AiUser
 } from '@vicons/carbon'
 
 const router = useRouter()
@@ -118,6 +119,21 @@ if (history.value.length === 0 && route.path) {
                     </n-button>
                 </template>
                 统计
+            </n-tooltip>
+
+            <!-- AI助手按钮 -->
+            <n-tooltip trigger="hover" placement="bottom">
+                <template #trigger>
+                    <n-button circle secondary :type="route.path === '/ai-assistant' ? 'primary' : 'default'"
+                        @click="navigateTo('/ai-assistant')" class="nav-btn">
+                        <template #icon>
+                            <n-icon>
+                                <AiUser />
+                            </n-icon>
+                        </template>
+                    </n-button>
+                </template>
+                AI专注助手
             </n-tooltip>
 
             <!-- 前进按钮 -->
