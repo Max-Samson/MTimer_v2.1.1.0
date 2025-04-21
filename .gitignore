@@ -7,7 +7,6 @@
 *.out
 *.app
 /bin/
-/build/
 /dist/
 /release/
 
@@ -17,7 +16,6 @@
 /.yarn
 /yarn.lock
 /package-lock.json
-/frontend/dist/
 /frontend/.vite/
 /frontend/.cache/
 /frontend/node_modules/
