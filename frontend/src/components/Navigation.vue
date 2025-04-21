@@ -8,7 +8,7 @@ import {
     List,
     ArrowLeft,
     ArrowRight,
-    AiUser
+    User
 } from '@vicons/carbon'
 
 const router = useRouter()
@@ -128,7 +128,7 @@ if (history.value.length === 0 && route.path) {
                         @click="navigateTo('/ai-assistant')" class="nav-btn">
                         <template #icon>
                             <n-icon>
-                                <AiUser />
+                                <User />
                             </n-icon>
                         </template>
                     </n-button>
@@ -139,7 +139,7 @@ if (history.value.length === 0 && route.path) {
             <!-- 前进按钮 -->
             <n-tooltip trigger="hover" placement="bottom">
                 <template #trigger>
-                    <n-button circle secondary :disabled="currentIndex >= history.values.length - 1" @click="goForward"
+                    <n-button circle secondary :disabled="currentIndex >= history.value.length - 1" @click="goForward"
                         class="nav-btn">
                         <template #icon>
                             <n-icon>

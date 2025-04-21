@@ -272,7 +272,7 @@ const changeTimerMode = (key: string) => {
                                     <span class="tab-label">AI助手</span>
                                 </div>
                             </template>
-                            <ai-assistant-view />
+                            <AIAssistantView />
                         </n-tab-pane>
                     </n-tabs>
                 </div>

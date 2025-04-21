@@ -7,6 +7,7 @@ import (
 	"MTimer/backend/controllers"
 	"MTimer/backend/controllers/types"
 	"MTimer/backend/models"
+	"MTimer/backend/utils"
 )
 
 // App struct
@@ -28,6 +29,11 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
 	log.Println("开始初始化应用...")
+
+	// 加载.env文件
+	if err := utils.LoadEnvFromFile(".env"); err != nil {
+		log.Printf("加载.env文件失败: %v", err)
+	}
 
 	// 初始化数据库
 	err := models.InitDatabase()
