@@ -17,8 +17,8 @@ export const useTodoStore = defineStore('todo', () => {
   // 状态
   const todos = ref<Todo[]>([])
   const currentTodo = ref<Todo | null>(null)
-  const dailyCompletedTodos = ref<number>(0)
-  const monthlyCompletedTodos = ref<number>(0)
+  const dailyCompletedTodos = ref<Todo[]>([])
+  const monthlyCompletedTodos = ref<Todo[]>([])
   let currentSessionId = ref<number | null>(null)
 
   // 加载待办事项
@@ -110,7 +110,7 @@ export const useTodoStore = defineStore('todo', () => {
     }
 
     // 更新统计数据
-    updateCompletedStats();
+    updateCompletedStats()
 
     console.log('待办事项已更新，保留了进行中任务的状态');
     return true; // 返回成功标志
@@ -122,13 +122,18 @@ export const useTodoStore = defineStore('todo', () => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
     const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime()
 
-    dailyCompletedTodos.value = todos.value.filter(todo =>
-      todo.completed && todo.createdAt >= today
-    ).length
+    const dailyCompleted = todos.value.filter(todo =>
+      todo.completed && todo.completedAt && todo.completedAt >= today
+    )
 
-    monthlyCompletedTodos.value = todos.value.filter(todo =>
-      todo.completed && todo.createdAt >= thisMonth
-    ).length
+    const monthlyCompleted = todos.value.filter(todo =>
+      todo.completed && todo.completedAt && todo.completedAt >= thisMonth
+    )
+
+    dailyCompletedTodos.value = dailyCompleted
+    monthlyCompletedTodos.value = monthlyCompleted
+
+    console.log(`今日已完成: ${dailyCompleted.length}, 本月已完成: ${monthlyCompleted.length}`)
   }
 
   // 添加待办事项
@@ -211,9 +216,25 @@ export const useTodoStore = defineStore('todo', () => {
           if (todo.completed) {
             todo.completedAt = Date.now();
             todo.status = 'completed';
+
+            // 更新已完成任务缓存
+            if (dailyCompletedTodos.value) {
+              dailyCompletedTodos.value.push(todo);
+            }
+            if (monthlyCompletedTodos.value) {
+              monthlyCompletedTodos.value.push(todo);
+            }
           } else {
             todo.completedAt = null;
             todo.status = 'pending';
+
+            // 从已完成任务缓存中移除
+            if (dailyCompletedTodos.value) {
+              dailyCompletedTodos.value = dailyCompletedTodos.value.filter(t => t.id !== todo.id);
+            }
+            if (monthlyCompletedTodos.value) {
+              monthlyCompletedTodos.value = monthlyCompletedTodos.value.filter(t => t.id !== todo.id);
+            }
           }
 
           // 更新统计数据

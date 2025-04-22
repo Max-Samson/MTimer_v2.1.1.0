@@ -40,8 +40,27 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 		req.Model = "deepseek-chat"
 	}
 
+	// 使用API密钥，优先使用请求中的API密钥
+	apiKey := c.apiKey
+	if req.ApiKey != "" {
+		apiKey = req.ApiKey
+		log.Println("使用请求中提供的API密钥")
+	}
+
+	// 检查API密钥是否为空
+	if apiKey == "" {
+		log.Println("API密钥未设置，使用模拟响应")
+		return c.getMockResponse(req)
+	}
+
 	// 准备请求数据
-	jsonData, err := json.Marshal(req)
+	// 创建新的请求对象，不包含ApiKey字段
+	apiReq := types.DeepSeekAPIRequest{
+		Model:    req.Model,
+		Messages: req.Messages,
+		Stream:   req.Stream,
+	}
+	jsonData, err := json.Marshal(apiReq)
 	if err != nil {
 		return nil, fmt.Errorf("序列化请求失败: %v", err)
 	}
@@ -54,9 +73,7 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 
 	// 设置请求头
 	httpReq.Header.Set("Content-Type", "application/json")
-	if c.apiKey != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+c.apiKey)
-	}
+	httpReq.Header.Set("Authorization", "Bearer "+apiKey)
 
 	// 发送请求
 	client := &http.Client{}
@@ -76,12 +93,6 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	var apiResp types.DeepSeekAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
 		return nil, fmt.Errorf("解析响应失败: %v", err)
-	}
-
-	// 如果没有有效的API密钥，使用模拟响应进行测试
-	if c.apiKey == "" {
-		log.Println("使用模拟响应进行测试")
-		return c.getMockResponse(req)
 	}
 
 	// 提取和处理任务数据

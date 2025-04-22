@@ -36,7 +36,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiSettings = ref<AISettings>({
     enabled: false,
     apiKey: '',
-    model: 'qianyi' // 默认使用千义模型
+    model: 'deepseek' // 默认使用deepseek模型
   })
 
   // 音乐设置
@@ -64,6 +64,10 @@ export const useSettingsStore = defineStore('settings', () => {
     const settings = localStorage.getItem('aiSettings')
     if (settings) {
       aiSettings.value = JSON.parse(settings)
+      // 确保model字段存在且为deepseek
+      if (!aiSettings.value.model) {
+        aiSettings.value.model = 'deepseek'
+      }
     }
   }
 

@@ -3,6 +3,8 @@ import * as runtime from '../wailsjs/runtime/runtime';
 declare global {
   interface Window {
     runtime?: typeof runtime;
+    webkitSpeechRecognition: any;
+    SpeechRecognition: any;
   }
 }
 

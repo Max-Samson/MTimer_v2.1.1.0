@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { h, ref, inject, nextTick } from 'vue'
+import { h, ref, inject, nextTick, onMounted, onUnmounted, computed } from 'vue'
 import { NLayout, NLayoutHeader, NLayoutContent, NSpace, NButton, NIcon, darkTheme, NTooltip, NDrawer, NDrawerContent, NTabPane, NTabs, NDropdown } from 'naive-ui'
-import { RouterView } from 'vue-router'
+import { RouterView, useRouter } from 'vue-router'
 import TomatoTimer from '../components/TomatoTimer.vue'
 import TodoList from '../components/TodoList.vue'
 import Navigation from '../components/Navigation.vue'
@@ -13,6 +13,9 @@ import MiniMusicController from '../components/MiniMusicController.vue'
 import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task, Rocket } from '@vicons/carbon'
 import { useSettingsStore, useTimerStore, useTodoStore } from '../stores'
 import { storeToRefs } from 'pinia'
+
+// 获取router实例
+const router = useRouter()
 
 // 从App.vue注入主题状态和切换方法
 const theme = inject('theme') as any
@@ -145,6 +148,38 @@ const changeTimerMode = (key: string) => {
         timerStore.switchTimerMode(key as 'pomodoro' | 'custom')
     }
 }
+
+// 直接进入设置页面
+const navigateToSettings = () => {
+  // 关闭设置抽屉
+  showSettings.value = false;
+
+  // 导航到设置页面
+  router.push('/settings');
+};
+
+// 窗口宽度响应式变量
+const windowWidth = ref(window.innerWidth)
+
+// 监听窗口大小变化
+const handleResize = () => {
+    windowWidth.value = window.innerWidth
+}
+
+// 根据窗口宽度计算抽屉宽度
+const drawerWidth = computed(() => {
+    return windowWidth.value > 1200 ? 1200 : '100%'
+})
+
+// 组件挂载时添加窗口大小变化监听
+onMounted(() => {
+    window.addEventListener('resize', handleResize)
+})
+
+// 组件卸载时移除监听
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+})
 </script>
 
 <template>
@@ -280,7 +315,7 @@ const changeTimerMode = (key: string) => {
         </n-layout-header>
 
         <!-- 设置抽屉 -->
-        <n-drawer v-model:show="showSettings" :width="300" placement="right">
+        <n-drawer v-model:show="showSettings" :width="drawerWidth" placement="right">
             <n-drawer-content title="设置" closable>
                 <settings-view />
             </n-drawer-content>
@@ -648,5 +683,22 @@ const changeTimerMode = (key: string) => {
         opacity: 0;
         transform: scale(40, 40);
     }
+}
+
+/* 抽屉样式覆盖 */
+:deep(.n-drawer-content-wrapper) {
+    width: 100%;
+    max-width: 100%;
+}
+
+:deep(.n-drawer-content) {
+    width: 100%;
+    max-width: 100%;
+}
+
+:deep(.settings-view),
+:deep(.settings-card) {
+    width: 100%;
+    max-width: 100%;
 }
 </style>
