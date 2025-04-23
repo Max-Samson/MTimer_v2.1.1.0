@@ -52,7 +52,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { NIcon, NSpin, NEmpty, NButton } from 'naive-ui';
 import { Timer, CheckmarkDone, TimeOutline } from '@vicons/ionicons5';
 import WeekTrendChart from './WeekTrendChart.vue';
@@ -182,12 +182,37 @@ const fetchData = async () => {
 
 // 刷新数据
 const refreshData = () => {
-  fetchData();
+  loading.value = true;
+  fetchData().finally(() => {
+    loading.value = false;
+  });
+};
+
+// 设置自动刷新
+const setupAutoRefresh = () => {
+  // 当窗口重新获得焦点时刷新数据
+  window.addEventListener('focus', () => {
+    console.log("窗口获得焦点，自动刷新数据");
+    refreshData();
+  });
+
+  // 设置定时器定期刷新数据（每5分钟一次）
+  const interval = setInterval(() => {
+    console.log("定时刷新数据");
+    refreshData();
+  }, 5 * 60 * 1000);
+
+  // 组件卸载时清理
+  onBeforeUnmount(() => {
+    window.removeEventListener('focus', refreshData);
+    clearInterval(interval);
+  });
 };
 
 // 组件挂载时获取数据
 onMounted(() => {
   fetchData();
+  setupAutoRefresh();
 });
 </script>
 

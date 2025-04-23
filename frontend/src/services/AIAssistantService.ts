@@ -32,13 +32,7 @@ interface DeepSeekResponse {
 }
 
 class AIAssistantServiceClass {
-  private chatHistory: Ref<ChatMessage[]> = ref([
-    {
-      role: 'assistant',
-      content: '你好！我是你的番茄工作法AI时间助手。请告诉我你今天想要完成的任务，我会帮你安排合理的专注时间计划。',
-      timestamp: Date.now()
-    }
-  ]);
+  private chatHistory: Ref<ChatMessage[]> = ref([]);
   private isLoading: Ref<boolean> = ref(false);
   private currentChatMode: Ref<ChatMode> = ref('task');
   private settingsStore: ReturnType<typeof useSettingsStore> | null = null;
@@ -50,15 +44,13 @@ class AIAssistantServiceClass {
     this.isLoading.value = false;
     this.currentChatMode.value = 'task';
 
-    // 设置初始欢迎消息，以防止在加载过程中出现undefined
-    this.setDefaultWelcomeMessage();
-
-    // 从本地存储加载聊天历史（会覆盖默认欢迎消息，如果存在的话）
+    // 从本地存储加载聊天历史
     try {
       this.loadChatHistoryFromStorage();
     } catch (error) {
-      console.error('加载聊天历史失败，使用默认欢迎消息:', error);
-      // 已经在构造函数开始设置了默认消息，所以这里无需再次设置
+      console.error('加载聊天历史失败:', error);
+      // 不设置默认欢迎消息，让用户直接与DeepSeek交互
+      this.chatHistory.value = [];
     }
 
     try {
@@ -161,33 +153,7 @@ class AIAssistantServiceClass {
   // 设置聊天模式
   setChatMode(mode: ChatMode): void {
     this.currentChatMode.value = mode;
-
-    // 如果切换模式，添加提示消息
-    if (this.chatHistory.value.length > 0 &&
-        this.chatHistory.value[this.chatHistory.value.length - 1].role === 'assistant') {
-
-      let welcomeMessage = '';
-      switch (mode) {
-        case 'task':
-          welcomeMessage = '已切换到任务规划模式。请告诉我你需要完成的任务，我会帮你安排番茄工作法时间计划。';
-          break;
-        case 'chat':
-          welcomeMessage = '已切换到日常聊天模式。有什么我可以帮助你的吗？';
-          break;
-        case 'study':
-          welcomeMessage = '已切换到学习助手模式。请告诉我你的学习目标或问题，我会提供相关建议和资料。';
-          break;
-      }
-
-      this.chatHistory.value.push({
-        role: 'assistant',
-        content: welcomeMessage,
-        timestamp: Date.now()
-      });
-
-      // 更新本地存储
-      this.saveChatHistoryToStorage();
-    }
+    console.log('已切换到', mode, '模式');
   }
 
   // 发送消息到AI服务
@@ -249,36 +215,36 @@ class AIAssistantServiceClass {
     }
   }
 
-  // 上传图片并发送消息
-  async sendImageMessage(image: File, message: string = ''): Promise<void> {
-    if (this.isLoading.value) return;
+  // // 上传图片并发送消息
+  // async sendImageMessage(image: File, message: string = ''): Promise<void> {
+  //   if (this.isLoading.value) return;
 
-    try {
-      // 读取图片文件并转换为base64
-      const reader = new FileReader();
+  //   try {
+  //     // 读取图片文件并转换为base64
+  //     const reader = new FileReader();
 
-      reader.onload = async (e) => {
-        const base64Image = e.target?.result as string;
+  //     reader.onload = async (e) => {
+  //       const base64Image = e.target?.result as string;
 
-        // 发送消息和图片
-        await this.sendMessage(message, base64Image);
-      };
+  //       // 发送消息和图片
+  //       await this.sendMessage(message, base64Image);
+  //     };
 
-      reader.readAsDataURL(image);
-    } catch (error) {
-      console.error('Error processing image:', error);
+  //     reader.readAsDataURL(image);
+  //   } catch (error) {
+  //     console.error('Error processing image:', error);
 
-      // 显示错误消息
-      this.chatHistory.value.push({
-        role: 'assistant',
-        content: '抱歉，处理图片时出现错误。请尝试使用其他图片或直接发送文字消息。',
-        timestamp: Date.now()
-      });
+  //     // 显示错误消息
+  //     this.chatHistory.value.push({
+  //       role: 'assistant',
+  //       content: '抱歉，处理图片时出现错误。请尝试使用其他图片或直接发送文字消息。',
+  //       timestamp: Date.now()
+  //     });
 
-      // 更新本地存储
-      this.saveChatHistoryToStorage();
-    }
-  }
+  //     // 更新本地存储
+  //     this.saveChatHistoryToStorage();
+  //   }
+  // }
 
   // 调用DeepSeek API
   private async callDeepSeekAPI(userMessage: string, image?: string): Promise<DeepSeekResponse> {
@@ -294,7 +260,7 @@ class AIAssistantServiceClass {
 
     switch (this.currentChatMode.value) {
       case 'task':
-        systemPrompt = `你是一个专业的番茄工作法时间管理助手。当用户描述他们的任务时，请按以下要求帮助规划：
+        systemPrompt = `你是一个专业的番茄工作法专注时间管理助手。当用户描述他们的任务时，请按以下要求帮助规划：
 1. 解析用户的任务请求
 2. 生成合理的番茄工作法时间安排
 3. 返回友好的文字说明和结构化的任务数据
@@ -524,13 +490,7 @@ JSON格式示例：
 
   // 清空聊天历史
   clearChatHistory(): void {
-    this.chatHistory.value = [
-      {
-        role: 'assistant',
-        content: '你好！我是你的番茄工作法AI时间助手。请告诉我你今天想要完成的任务，我会帮你安排合理的专注时间计划。',
-        timestamp: Date.now()
-      }
-    ];
+    this.chatHistory.value = [];
 
     // 更新本地存储
     this.saveChatHistoryToStorage();
@@ -560,15 +520,15 @@ JSON格式示例：
             console.log('成功从localStorage加载聊天历史，条数:', parsedHistory.length);
           } else {
             console.warn('从localStorage加载的聊天历史无效或为空，使用默认欢迎消息');
-            this.setDefaultWelcomeMessage();
+            this.chatHistory.value = [];
           }
         } catch (parseError) {
           console.error('解析localStorage中的聊天历史失败:', parseError);
-          this.setDefaultWelcomeMessage();
+          this.chatHistory.value = [];
         }
       } else {
         console.log('localStorage中没有聊天历史，使用默认欢迎消息');
-        this.setDefaultWelcomeMessage();
+        this.chatHistory.value = [];
       }
 
       if (storedMode && (storedMode === 'task' || storedMode === 'chat' || storedMode === 'study')) {
@@ -576,19 +536,8 @@ JSON格式示例：
       }
     } catch (error) {
       console.error('Error loading chat history from storage:', error);
-      this.setDefaultWelcomeMessage();
+      this.chatHistory.value = [];
     }
-  }
-
-  // 设置默认欢迎消息
-  private setDefaultWelcomeMessage(): void {
-    this.chatHistory.value = [
-      {
-        role: 'assistant',
-        content: '你好！我是你的番茄工作法AI时间助手。请告诉我你今天想要完成的任务，我会帮你安排合理的专注时间计划。',
-        timestamp: Date.now()
-      }
-    ];
   }
 
   // 修改处理DeepSeek API调用的方法

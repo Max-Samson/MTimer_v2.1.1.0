@@ -95,7 +95,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, nextTick, onBeforeUnmount } from 'vue';
+import { ref, onMounted, reactive, computed, nextTick, onBeforeUnmount, watch } from 'vue';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart, RadarChart } from 'echarts/charts';
 import {
@@ -143,6 +143,9 @@ const timeFilters = [
 
 // 当前选中的过滤器
 const currentFilter = ref('7days');
+
+// 自动刷新标记
+const dataRefreshKey = ref(0);
 
 // 自定义日期范围
 const today = new Date();
@@ -195,132 +198,146 @@ const formatMinutes = (minutes: number): string => {
 const initPomodoroTrendChart = () => {
   if (!pomodoroTrendChart.value || stats.trendData.length === 0) return;
 
+  console.log("正在初始化番茄趋势图，数据条数:", stats.trendData.length);
+
   // 初始化图表
   if (!pomodoroTrendChartInstance) {
     pomodoroTrendChartInstance = echarts.init(pomodoroTrendChart.value);
   }
 
-  // 准备数据
-  const dates = stats.trendData.map(item => {
-    // 简化日期显示，只保留月/日格式
-    const dateParts = item.date.split('-');
-    if (dateParts.length >= 3) {
-      return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`;
-    }
-    return item.date.substring(5).replace('-', '/');
-  });
-  const pomodoroCountData = stats.trendData.map(item => item.pomodoroCount || 0);
-  const tomatoHarvestsData = stats.trendData.map(item => item.tomatoHarvests || 0);
+  try {
+    // 标准化数据，确保所有必要字段都是有效值
+    const normalizedData = stats.trendData.map(item => ({
+      date: item.date || '',
+      pomodoroCount: typeof item.pomodoroCount === 'number' ? item.pomodoroCount : 0,
+      tomatoHarvests: typeof item.tomatoHarvests === 'number' ? item.tomatoHarvests : 0,
+      totalFocusMinutes: typeof item.totalFocusMinutes === 'number' ? item.totalFocusMinutes : 0
+    }));
 
-  // 计算合适的Y轴最大值
-  const maxCount = Math.max(...pomodoroCountData, ...tomatoHarvestsData, 1);
-  const maxY = Math.ceil(maxCount * 1.2); // 增加20%的空间
+    // 准备数据
+    const dates = normalizedData.map(item => {
+      // 简化日期显示，只保留月/日格式
+      const dateParts = item.date.split('-');
+      if (dateParts.length >= 3) {
+        return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`;
+      }
+      return item.date.substring(5).replace('-', '/');
+    });
+    const pomodoroCountData = normalizedData.map(item => item.pomodoroCount || 0);
+    const tomatoHarvestsData = normalizedData.map(item => item.tomatoHarvests || 0);
 
-  // 图表主题色定义
-  const pomodoroColor = '#ff6b6b';
-  const harvestColor = '#ff9f43';
+    // 计算合适的Y轴最大值
+    const maxCount = Math.max(...pomodoroCountData, ...tomatoHarvestsData, 1);
+    const maxY = Math.ceil(maxCount * 1.2); // 增加20%的空间
 
-  // 配置选项
-  const option = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
-      },
-      formatter: function(params: Array<any>) {
-        let result = params[0].name + '<br/>';
-        params.forEach(item => {
-          const markerSpan = `<span style="display:inline-block;margin-right:5px;border-radius:50%;width:10px;height:10px;background-color:${item.color};"></span>`;
-          result += `${markerSpan}${item.seriesName}: ${item.value}<br/>`;
-        });
-        return result;
-      }
-    },
-    legend: {
-      data: ['专注次数', '番茄收成'],
-      bottom: 0,
-      textStyle: {
-        color: '#333'
-      }
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '15%',
-      top: '3%',
-      containLabel: true
-    },
-    xAxis: [
-      {
-        type: 'category',
-        data: dates,
-        axisLabel: {
-          formatter: '{value}',
-          color: '#666',
-          interval: 0,
-          rotate: dates.length > 7 ? 30 : 0 // 当数据过多时旋转标签
+    // 图表主题色定义
+    const pomodoroColor = '#ff6b6b';
+    const harvestColor = '#ff9f43';
+
+    // 配置选项
+    const option = {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: {
+          type: 'shadow'
         },
-        axisLine: {
-          lineStyle: {
-            color: '#ddd'
-          }
-        }
-      }
-    ],
-    yAxis: [
-      {
-        type: 'value',
-        name: '次数',
-        min: 0,
-        max: maxY,
-        interval: Math.ceil(maxY / 5),
-        minInterval: 1,
-        axisLabel: {
-          formatter: '{value}',
-          color: '#666'
-        },
-        axisLine: {
-          lineStyle: {
-            color: '#ddd'
-          }
-        },
-        splitLine: {
-          lineStyle: {
-            color: 'rgba(220,220,220,0.5)'
-          }
-        }
-      }
-    ],
-    series: [
-      {
-        name: '专注次数',
-        type: 'bar',
-        barWidth: '40%',
-        data: pomodoroCountData,
-        itemStyle: {
-          color: pomodoroColor,
-          borderRadius: [3, 3, 0, 0]
+        formatter: function(params: Array<any>) {
+          let result = params[0].name + '<br/>';
+          params.forEach(item => {
+            const markerSpan = `<span style="display:inline-block;margin-right:5px;border-radius:50%;width:10px;height:10px;background-color:${item.color};"></span>`;
+            result += `${markerSpan}${item.seriesName}: ${item.value}<br/>`;
+          });
+          return result;
         }
       },
-      {
-        name: '番茄收成',
-        type: 'line',
-        smooth: true,
-        symbol: 'circle',
-        symbolSize: 6,
-        data: tomatoHarvestsData,
-        itemStyle: {
-          color: harvestColor
-        },
-        lineStyle: {
-          width: 3,
-          color: harvestColor
+      legend: {
+        data: ['专注次数', '番茄收成'],
+        bottom: 0,
+        textStyle: {
+          color: '#333'
         }
-      }
-    ]
-  };
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '15%',
+        top: '3%',
+        containLabel: true
+      },
+      xAxis: [
+        {
+          type: 'category',
+          data: dates,
+          axisLabel: {
+            formatter: '{value}',
+            color: '#666',
+            interval: 0,
+            rotate: dates.length > 7 ? 30 : 0 // 当数据过多时旋转标签
+          },
+          axisLine: {
+            lineStyle: {
+              color: '#ddd'
+            }
+          }
+        }
+      ],
+      yAxis: [
+        {
+          type: 'value',
+          name: '次数',
+          min: 0,
+          max: maxY,
+          interval: Math.ceil(maxY / 5),
+          minInterval: 1,
+          axisLabel: {
+            formatter: '{value}',
+            color: '#666'
+          },
+          axisLine: {
+            lineStyle: {
+              color: '#ddd'
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              color: 'rgba(220,220,220,0.5)'
+            }
+          }
+        }
+      ],
+      series: [
+        {
+          name: '专注次数',
+          type: 'bar',
+          barWidth: '40%',
+          data: pomodoroCountData,
+          itemStyle: {
+            color: pomodoroColor,
+            borderRadius: [3, 3, 0, 0]
+          }
+        },
+        {
+          name: '番茄收成',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          data: tomatoHarvestsData,
+          itemStyle: {
+            color: harvestColor
+          },
+          lineStyle: {
+            width: 3,
+            color: harvestColor
+          }
+        }
+      ]
+    };
 
-  pomodoroTrendChartInstance.setOption(option);
+    pomodoroTrendChartInstance.setOption(option);
+  } catch (error) {
+    console.error("初始化番茄趋势图失败:", error);
+  }
 };
 
 const initTimeDistributionChart = () => {
@@ -503,160 +520,112 @@ const changeTimeFilter = (filterValue: string) => {
   loadData();
 };
 
-// 刷新数据
-const refreshData = async () => {
-  // 清除现有图表实例
-  if (pomodoroTrendChartInstance) {
-    pomodoroTrendChartInstance.dispose();
-    pomodoroTrendChartInstance = null;
-  }
-
-  if (timeDistributionChartInstance) {
-    timeDistributionChartInstance.dispose();
-    timeDistributionChartInstance = null;
-  }
-
-  // 重置状态，确保完全刷新
-  stats.trendData = [];
-  stats.timeDistribution = [];
-  stats.totalPomodoros = 0;
-  stats.bestDay = {
-    date: '',
-    pomodoroCount: 0,
-    customCount: 0,
-    totalFocusSessions: 0,
-    pomodoroMinutes: 0,
-    customMinutes: 0,
-    totalFocusMinutes: 0,
-    totalBreakMinutes: 0,
-    tomatoHarvests: 0,
-    timeRanges: []
-  };
-
-  // 等待DOM更新
-  await nextTick();
-
-  // 确保容器已清空
-  if (pomodoroTrendChart.value) {
-    pomodoroTrendChart.value.innerHTML = '';
-  }
-
-  if (timeDistributionChart.value) {
-    timeDistributionChart.value.innerHTML = '';
-  }
-
-  // 重新加载数据
-  await loadData();
-
-  // 显示成功提示
-  if (stats.trendData.length > 0) {
-    showSuccessToast?.('统计数据已刷新');
-  }
-};
-
-// 初始化图表，确保图表容器尺寸稳定
-const initCharts = async () => {
-  // 确保DOM已更新
-  await nextTick();
-
-  // 延迟初始化，确保容器尺寸已稳定
-  setTimeout(() => {
-    initPomodoroTrendChart();
-    initTimeDistributionChart();
-
-    // 添加额外延迟后的再次调整，处理某些浏览器渲染延迟问题
-    setTimeout(() => {
-      if (pomodoroTrendChartInstance) {
-        pomodoroTrendChartInstance.resize();
-      }
-
-      if (timeDistributionChartInstance) {
-        timeDistributionChartInstance.resize();
-      }
-    }, 200);
-  }, 100);
-};
-
-// 修改loadData函数，使用新的initCharts方法
+// 加载番茄数据
 const loadData = async () => {
-  try {
-    loading.value = true;
+  loading.value = true;
 
-    // 根据选择的时间范围计算开始和结束日期
+  try {
+    // 获取日期范围
     let start = '';
     let end = '';
 
-    const today = new Date();
-    end = today.toISOString().split('T')[0];
-
     switch (currentFilter.value) {
       case '7days':
-        start = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+        start = sevenDaysAgo.toISOString().split('T')[0];
+        end = new Date().toISOString().split('T')[0];
         break;
       case '30days':
-        start = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+        start = thirtyDaysAgo.toISOString().split('T')[0];
+        end = new Date().toISOString().split('T')[0];
         break;
       case 'thisMonth':
-        start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+        const firstDay = new Date();
+        firstDay.setDate(1);
+        start = firstDay.toISOString().split('T')[0];
+        end = new Date().toISOString().split('T')[0];
         break;
       case 'custom':
         start = startDate.value;
         end = endDate.value;
         break;
-      default:
-        start = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     }
 
-    console.log(`加载从 ${start} 到 ${end} 的番茄统计数据`);
+    console.log(`加载番茄统计数据，开始日期: ${start}, 结束日期: ${end}`);
 
-    // 获取番茄统计数据
-    const response = await dbService.getPomodoroStats(start, end);
+    // 调用API获取数据
+    const data = await dbService.getPomodoroStats(start, end);
+    console.log("获取到的番茄统计数据:", data);
 
-    if (!response) {
-      console.error('获取番茄统计数据失败，返回为空');
-      return;
+    // 检查数据是否为空
+    if (!data ||
+        !data.trendData || data.trendData.length === 0 ||
+        !data.timeDistribution || data.timeDistribution.length === 0) {
+      console.warn("获取到的数据为空或无效");
     }
 
-    // 更新状态
-    Object.assign(stats, response);
+    // 更新数据
+    stats.totalPomodoros = data.totalPomodoros;
+    stats.bestDay = data.bestDay;
+    stats.trendData = data.trendData;
+    stats.timeDistribution = data.timeDistribution;
 
-    // 如果数据加载成功但没有趋势数据，显示警告
-    if (stats.trendData.length === 0) {
-      console.warn('未加载到趋势数据');
-    }
-
-    // 如果数据加载成功但没有时间分布数据，显示警告
-    if (stats.timeDistribution.length === 0) {
-      console.warn('未加载到时间分布数据');
-    }
-
-    // 使用新的初始化图表方法
-    await initCharts();
-
+    // 确保界面更新后绘制图表
+    nextTick(() => {
+      console.log("数据加载完成，绘制图表");
+      initPomodoroTrendChart();
+      initTimeDistributionChart();
+    });
   } catch (error) {
-    console.error('加载番茄统计数据出错:', error);
+    console.error("加载番茄统计数据失败:", error);
   } finally {
     loading.value = false;
   }
 };
 
-// 显示成功提示的函数
-const showSuccessToast = (message: string) => {
-  if (typeof window !== 'undefined' && window.document) {
-    const toast = document.createElement('div');
-    toast.className = 'success-toast';
-    toast.textContent = message;
-    document.body.appendChild(toast);
-
-    // 2秒后自动移除
-    setTimeout(() => {
-      toast.classList.add('toast-fade-out');
-      setTimeout(() => {
-        document.body.removeChild(toast);
-      }, 300);
-    }, 2000);
-  }
+// 用于强制刷新数据
+const refreshData = () => {
+  console.log("手动刷新数据");
+  dataRefreshKey.value++;
+  loadData();
 };
+
+// 设置自动刷新
+const setupAutoRefresh = () => {
+  // 当窗口重新获得焦点时刷新数据
+  window.addEventListener('focus', () => {
+    console.log("窗口获得焦点，自动刷新数据");
+    refreshData();
+  });
+
+  // 设置定时器定期刷新数据（每5分钟一次）
+  const interval = setInterval(() => {
+    console.log("定时刷新数据");
+    refreshData();
+  }, 5 * 60 * 1000);
+
+  // 组件卸载时清理
+  onBeforeUnmount(() => {
+    window.removeEventListener('focus', refreshData);
+    clearInterval(interval);
+  });
+};
+
+// 组件挂载时获取数据
+onMounted(() => {
+  loadData();
+  setupAutoRefresh();
+});
+
+// 监听刷新键，自动重载数据
+watch(dataRefreshKey, () => {
+  if (dataRefreshKey.value > 0) {
+    loadData();
+  }
+});
 
 // 窗口大小改变时重绘图表
 const handleResize = () => {
@@ -673,10 +642,6 @@ onBeforeUnmount(() => {
   // 销毁图表实例
   pomodoroTrendChartInstance?.dispose();
   timeDistributionChartInstance?.dispose();
-});
-
-onMounted(() => {
-  loadData();
 });
 </script>
 

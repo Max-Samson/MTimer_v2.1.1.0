@@ -13,58 +13,65 @@
 DELETE FROM focus_sessions;
 DELETE FROM todos;
 DELETE FROM daily_stats;
+DELETE FROM event_stats;
+
+-- 重置自增ID
+DELETE FROM sqlite_sequence WHERE name='todos';
+DELETE FROM sqlite_sequence WHERE name='focus_sessions';
+DELETE FROM sqlite_sequence WHERE name='daily_stats';
 
 -- ==============================================
 -- 一、创建测试待办事项
 -- ==============================================
 
 -- 1. 已完成的待办事项 - 不同模式、不同完成时间分布
-INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, completed_at)
+INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, completed_at, last_focus_timestamp)
 VALUES
 -- 今天完成的任务
-('学习React基础', 0, 'completed', datetime('now', '-3 days'), datetime('now'), 4, datetime('now', '-2 hours')),
-('编写项目文档', 0, 'completed', datetime('now', '-4 days'), datetime('now'), 6, datetime('now', '-5 hours')),
+('学习React基础', 0, 'completed', datetime('now', '-3 days'), datetime('now'), 4, datetime('now', '-2 hours'), datetime('now', '-2 hours')),
+('编写项目文档', 0, 'completed', datetime('now', '-4 days'), datetime('now'), 6, datetime('now', '-5 hours'), datetime('now', '-5 hours')),
 -- 昨天完成的任务
-('重构数据模型', 1, 'completed', datetime('now', '-5 days'), datetime('now', '-1 days'), 3, datetime('now', '-1 days', '-3 hours')),
-('设计登录页面', 0, 'completed', datetime('now', '-3 days'), datetime('now', '-1 days'), 4, datetime('now', '-1 days', '-5 hours')),
-('完成API文档', 0, 'completed', datetime('now', '-4 days'), datetime('now', '-1 days'), 5, datetime('now', '-1 days', '-8 hours')),
+('重构数据模型', 1, 'completed', datetime('now', '-5 days'), datetime('now', '-1 days'), 3, datetime('now', '-1 days', '-3 hours'), datetime('now', '-1 days', '-3 hours')),
+('设计登录页面', 0, 'completed', datetime('now', '-3 days'), datetime('now', '-1 days'), 4, datetime('now', '-1 days', '-5 hours'), datetime('now', '-1 days', '-5 hours')),
+('完成API文档', 0, 'completed', datetime('now', '-4 days'), datetime('now', '-1 days'), 5, datetime('now', '-1 days', '-8 hours'), datetime('now', '-1 days', '-8 hours')),
 -- 前天完成的任务
-('实现用户登录功能', 0, 'completed', datetime('now', '-6 days'), datetime('now', '-2 days'), 8, datetime('now', '-2 days', '-4 hours')),
+('实现用户登录功能', 0, 'completed', datetime('now', '-6 days'), datetime('now', '-2 days'), 8, datetime('now', '-2 days', '-4 hours'), datetime('now', '-2 days', '-4 hours')),
 -- 3天前完成的任务
-('优化首页性能', 1, 'completed', datetime('now', '-10 days'), datetime('now', '-3 days'), 7, datetime('now', '-3 days', '-6 hours')),
-('修复安全漏洞', 0, 'completed', datetime('now', '-8 days'), datetime('now', '-3 days'), 5, datetime('now', '-3 days', '-2 hours')),
+('优化首页性能', 1, 'completed', datetime('now', '-10 days'), datetime('now', '-3 days'), 7, datetime('now', '-3 days', '-6 hours'), datetime('now', '-3 days', '-6 hours')),
+('修复安全漏洞', 0, 'completed', datetime('now', '-8 days'), datetime('now', '-3 days'), 5, datetime('now', '-3 days', '-2 hours'), datetime('now', '-3 days', '-2 hours')),
 -- 4天前完成的任务
-('设计数据库结构', 1, 'completed', datetime('now', '-12 days'), datetime('now', '-4 days'), 6, datetime('now', '-4 days', '-7 hours')),
+('设计数据库结构', 1, 'completed', datetime('now', '-12 days'), datetime('now', '-4 days'), 6, datetime('now', '-4 days', '-7 hours'), datetime('now', '-4 days', '-7 hours')),
 -- 5天前完成的任务
-('编写单元测试', 0, 'completed', datetime('now', '-11 days'), datetime('now', '-5 days'), 4, datetime('now', '-5 days', '-5 hours')),
+('编写单元测试', 0, 'completed', datetime('now', '-11 days'), datetime('now', '-5 days'), 4, datetime('now', '-5 days', '-5 hours'), datetime('now', '-5 days', '-5 hours')),
 -- 6天前完成的任务
-('实现注册功能', 0, 'completed', datetime('now', '-14 days'), datetime('now', '-6 days'), 7, datetime('now', '-6 days', '-3 hours')),
+('实现注册功能', 0, 'completed', datetime('now', '-14 days'), datetime('now', '-6 days'), 7, datetime('now', '-6 days', '-3 hours'), datetime('now', '-6 days', '-3 hours')),
 -- 一周前完成的任务
-('项目需求分析', 1, 'completed', datetime('now', '-15 days'), datetime('now', '-7 days'), 8, datetime('now', '-7 days', '-4 hours'));
+('项目需求分析', 1, 'completed', datetime('now', '-15 days'), datetime('now', '-7 days'), 8, datetime('now', '-7 days', '-4 hours'), datetime('now', '-7 days', '-4 hours'));
 
 -- 2. 待处理的待办事项
-INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros)
+INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, last_focus_timestamp)
 VALUES
-('开发用户中心界面', 0, 'pending', datetime('now', '-2 days'), datetime('now'), 5),
-('实现消息推送功能', 1, 'pending', datetime('now', '-3 days'), datetime('now'), 6),
-('编写系统文档', 0, 'pending', datetime('now', '-1 days'), datetime('now'), 3),
-('代码审查和优化', 0, 'pending', datetime('now', '-4 days'), datetime('now'), 4),
-('研究新技术方案', 1, 'pending', datetime('now', '-2 days'), datetime('now'), 7);
+('开发用户中心界面', 0, 'pending', datetime('now', '-2 days'), datetime('now'), 5, datetime('now', '-2 days')),
+('实现消息推送功能', 1, 'pending', datetime('now', '-3 days'), datetime('now'), 6, datetime('now', '-3 days')),
+('编写系统文档', 0, 'pending', datetime('now', '-1 days'), datetime('now'), 3, datetime('now', '-1 days')),
+('代码审查和优化', 0, 'pending', datetime('now', '-4 days'), datetime('now'), 4, datetime('now', '-4 days')),
+('研究新技术方案', 1, 'pending', datetime('now', '-2 days'), datetime('now'), 7, datetime('now', '-2 days'));
 
 -- 3. 进行中的待办事项
-INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros)
+INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, last_focus_timestamp)
 VALUES
-('实现数据可视化功能', 0, 'inProgress', datetime('now', '-1 days'), datetime('now'), 8),
-('优化移动端适配', 1, 'inProgress', datetime('now', '-2 days'), datetime('now'), 4);
+('实现数据可视化功能', 0, 'inProgress', datetime('now', '-1 days'), datetime('now'), 8, datetime('now', '-1 days')),
+('优化移动端适配', 1, 'pending', datetime('now', '-2 days'), datetime('now'), 4, datetime('now', '-2 days'));
 
 -- ==============================================
 -- 二、创建专注会话记录
 -- ==============================================
 
 -- 为每个已完成的待办事项添加相应数量的专注会话
-INSERT INTO focus_sessions (todo_id, start_time, end_time, break_time, duration, mode)
+INSERT INTO focus_sessions (todo_id, mode, start_time, end_time, duration, break_time)
 SELECT
     t.todo_id,
+    t.mode,
     -- 生成从早上8点到晚上10点之间不同时间的专注会话
     datetime(
         date(completed_at),
@@ -75,14 +82,13 @@ SELECT
         WHEN t.mode = 0 THEN datetime(start_time, '+25 minutes')
         ELSE datetime(start_time, '+' || (30 + (ABS(RANDOM()) % 16)) || ' minutes')
     END AS end_time,
-    -- 休息时间5-10分钟
-    5 + (ABS(RANDOM()) % 6) AS break_time,
     -- 专注时长
     CASE
         WHEN t.mode = 0 THEN 25
         ELSE 30 + (ABS(RANDOM()) % 16)
     END AS duration,
-    t.mode
+    -- 休息时间5-10分钟
+    5 + (ABS(RANDOM()) % 6) AS break_time
 FROM
     todos t
 JOIN
@@ -115,14 +121,14 @@ WITH in_progress_todos AS (
     WHERE status = 'inProgress'
 )
 
-INSERT INTO focus_sessions (todo_id, start_time, end_time, break_time, duration, mode)
+INSERT INTO focus_sessions (todo_id, mode, start_time, end_time, duration, break_time)
 SELECT
     t.todo_id,
+    t.mode,
     datetime('now', '-' || (i % 3) || ' days', '-' || (3 + (i % 5)) || ' hours') AS start_time,
     datetime('now', '-' || (i % 3) || ' days', '-' || (3 + (i % 5) - 1) || ' hours', '-' || (35 - i) || ' minutes') AS end_time,
-    5 AS break_time,
     CASE WHEN t.mode = 0 THEN 25 ELSE 30 + (i % 15) END AS duration,
-    t.mode
+    5 AS break_time
 FROM
     in_progress_todos t,
     (

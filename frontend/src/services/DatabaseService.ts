@@ -337,13 +337,12 @@ class DatabaseService {
     }
   }
 
-  // 获取昨日小结数据
+  // 获取每日摘要
   async getDailySummary(): Promise<DailySummaryResponse> {
     try {
-      // 确保App已绑定
+      // 检查是否处于开发模式
       if (!App) {
-        console.error('App未绑定，无法获取数据库数据');
-        // 返回空数据结构而不是模拟数据
+        console.warn('App未绑定，返回空数据结构');
         return {
           yesterdayStat: {
             date: '',
@@ -361,11 +360,39 @@ class DatabaseService {
         };
       }
 
-      console.log('正在从数据库获取每日摘要数据...');
-      // 使用类型断言解决TypeScript类型错误
+      // 先尝试更新统计数据，以确保获取最新数据
+      try {
+        const appAny = App as any;
+        await appAny.UpdateStats();
+        console.log('统计数据已更新');
+      } catch (updateErr) {
+        console.warn('更新统计数据失败，将使用现有数据:', updateErr);
+      }
+
+      // 获取每日摘要数据
+      console.log('获取每日摘要数据...');
       const appAny = App as any;
       const response = await appAny.GetDailySummary();
-      console.log('收到后端每日摘要数据(原始格式):', JSON.stringify(response));
+      console.log('后端返回的每日摘要数据:', response);
+
+      if (!response) {
+        console.warn('后端返回的每日摘要数据为空');
+        return {
+          yesterdayStat: {
+            date: '',
+            pomodoroCount: 0,
+            customCount: 0,
+            totalFocusSessions: 0,
+            pomodoroMinutes: 0,
+            customMinutes: 0,
+            totalFocusMinutes: 0,
+            totalBreakMinutes: 0,
+            tomatoHarvests: 0,
+            timeRanges: []
+          },
+          weekTrend: []
+        };
+      }
 
       // 确保week_trend数组存在
       if (!response.week_trend || !Array.isArray(response.week_trend)) {
@@ -463,6 +490,15 @@ class DatabaseService {
           completionRate: '0%',
           trendData: []
         };
+      }
+
+      // 先尝试更新统计数据，以确保获取最新数据
+      try {
+        const appAny = App as any;
+        await appAny.UpdateStats();
+        console.log('统计数据已更新');
+      } catch (updateErr) {
+        console.warn('更新统计数据失败，将使用现有数据:', updateErr);
       }
 
       // 获取真实数据
@@ -569,6 +605,15 @@ class DatabaseService {
         console.error('App未绑定，无法获取数据库数据');
         // 返回空统计数据
         return this.getEmptyPomodoroStats();
+      }
+
+      // 先尝试更新统计数据，以确保获取最新数据
+      try {
+        const appAny = App as any;
+        await appAny.UpdateStats();
+        console.log('统计数据已更新');
+      } catch (updateErr) {
+        console.warn('更新统计数据失败，将使用现有数据:', updateErr);
       }
 
       // 通过类型断言解决TypeScript类型检查问题
@@ -781,6 +826,15 @@ class DatabaseService {
           weekCompletedTasks: 0,
           weekFocusTime: 0
         };
+      }
+
+      // 先尝试更新统计数据，以确保获取最新数据
+      try {
+        const appAny = App as any;
+        await appAny.UpdateStats();
+        console.log('统计数据已更新');
+      } catch (updateErr) {
+        console.warn('更新统计数据失败，将使用现有数据:', updateErr);
       }
 
       console.log('从数据库获取统计摘要数据');

@@ -100,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed, nextTick, onBeforeUnmount, inject } from 'vue';
+import { ref, onMounted, reactive, computed, nextTick, onBeforeUnmount, inject, watch } from 'vue';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import {
@@ -141,6 +141,27 @@ const updateLastRefreshTime = inject('updateLastRefreshTime') as (() => void) | 
 const loading = ref(true);
 const autoRefresh = ref(false);
 let refreshTimer: number | null = null;
+
+// 添加错误状态
+const error = ref<string | null>(null);
+
+// 自动刷新标记
+const dataRefreshKey = ref(0);
+
+// 声明chart可见性变量
+const chartVisible = ref(true);
+
+// 声明访问值变量 - 这些是直接绑定到模板中使用的
+const totalEvents = ref(0);
+const completedEvents = ref(0);
+const completionRate = ref("0.00");
+const trendData = ref<any[]>([]);
+
+// 数据过滤条件
+const dateRange = ref({
+  startDate: '',
+  endDate: ''
+});
 
 // 时间过滤器选项
 const timeFilters = [
@@ -347,9 +368,6 @@ const loadData = async () => {
     completeLoading();
   }
 };
-
-// 图表可见性状态
-const chartVisible = ref(false);
 
 // 完成加载的通用方法
 const completeLoading = () => {
@@ -858,44 +876,57 @@ const refreshCharts = () => {
   }, 200);
 };
 
-onMounted(() => {
-  console.log('组件已挂载，立即开始加载数据');
+// 刷新数据
+const refreshData = () => {
+  loading.value = true;
+  console.log("手动刷新任务统计数据");
+  dataRefreshKey.value++;
+  loadData();
+};
 
-  // 设置一个定时器，如果数据在短时间内未加载完成，则强制显示样例数据
-  const initialLoadTimer = setTimeout(() => {
-    if (loading.value) {
-      console.warn('初始加载超时，显示样例数据');
-      forceStopLoading();
-    }
-  }, 3000); // 3秒后如果还在加载，则显示样例数据
-
-  // 确保在DOM渲染后立即加载数据
-  setTimeout(() => {
-    try {
-      loadData();
-    } catch (e) {
-      console.error('加载数据失败:', e);
-      forceStopLoading();
-    }
-
-    // 监听主题变化事件
-    document.documentElement.addEventListener('data-theme-changed', updateChartsTheme);
-
-    // 初始检查是否有主题变化
-    updateChartsTheme();
-
-    // 开启自动刷新
-    startAutoRefresh();
-
-    // 图表区域可能需要重新调整大小
-    window.dispatchEvent(new Event('resize'));
-  }, 100);
-
-  // 组件卸载时清除定时器
-  onBeforeUnmount(() => {
-    clearTimeout(initialLoadTimer);
+// 设置自动刷新
+const setupAutoRefresh = () => {
+  // 当窗口重新获得焦点时刷新数据
+  window.addEventListener('focus', () => {
+    console.log("窗口获得焦点，自动刷新任务统计数据");
+    refreshData();
   });
+
+  // 设置定时器定期刷新数据（每5分钟一次）
+  const interval = setInterval(() => {
+    console.log("定时刷新任务统计数据");
+    refreshData();
+  }, 5 * 60 * 1000);
+
+  // 组件卸载时清理
+  onBeforeUnmount(() => {
+    window.removeEventListener('focus', refreshData);
+    clearInterval(interval);
+  });
+};
+
+// 监听刷新键，自动重载数据
+watch(dataRefreshKey, () => {
+  if (dataRefreshKey.value > 0) {
+    loadData();
+  }
 });
+
+// 组件挂载时加载数据
+onMounted(() => {
+  loadData();
+  setupAutoRefresh();
+});
+
+// 更新图表函数
+const updateChart = () => {
+  if (completionRateChartInstance) {
+    initCompletionRateChart();
+  }
+  if (workloadTrendChartInstance) {
+    initWorkloadTrendChart();
+  }
+};
 </script>
 
 <style scoped>

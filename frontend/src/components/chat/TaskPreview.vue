@@ -73,6 +73,7 @@
               >
                 <td class="py-1.5 px-3 text-gray-800 dark:text-gray-200">
                   <div class="flex items-center">
+                    <span class="task-number flex-shrink-0 w-6 h-6 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full font-medium text-xs mr-2">{{index + 1}}</span>
                     <n-icon size="16" class="text-indigo-500 dark:text-indigo-400 mr-1.5 flex-shrink-0">
                       <Calendar v-if="task.mode === 'pomodoro'" />
                       <Task v-else-if="task.mode === 'deep_work'" />
@@ -116,7 +117,10 @@
         size="small"
         class="transition-all duration-300 transform hover:scale-105"
       >
-        {{ task.name }} ({{ task.focusDuration }}分钟)
+        <span class="inline-flex items-center">
+          <span class="tag-number inline-flex items-center justify-center w-5 h-5 bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-medium mr-1.5 shadow-sm">{{index + 1}}</span>
+          {{ task.name }} ({{ task.focusDuration }}分钟)
+        </span>
       </n-tag>
       <div class="text-xs text-gray-500 dark:text-gray-400 w-full mt-1 text-center cursor-pointer hover:text-indigo-500" @click="isExpanded = true">
         点击展开查看详情...
@@ -131,6 +135,7 @@ import { format, addMinutes } from 'date-fns';
 import { CheckmarkFilled, Calendar, Document, Time, ExpandAll, CollapseAll, Pause, PlayFilled, Task } from '@vicons/carbon';
 import { TimeOutline } from '@vicons/ionicons5';
 import { TaskPlan } from '../../services/AIAssistantService';
+import { NTable, NCard, NIcon, NButton, NTag } from 'naive-ui';
 
 const props = defineProps<{
   tasks: TaskPlan[];
@@ -242,6 +247,28 @@ function handleApply(): void {
 :deep(.n-tag):hover {
   transform: translateY(-2px);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* 任务编号样式 */
+.task-number {
+  transition: all 0.3s ease;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+tr:hover .task-number {
+  transform: scale(1.1);
+  background-color: rgba(99, 102, 241, 0.3);
+  color: white;
+}
+
+.tag-number {
+  transition: all 0.3s ease;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+:deep(.n-tag:hover) .tag-number {
+  transform: scale(1.1);
+  background-color: rgba(99, 102, 241, 0.2);
 }
 </style>
 

@@ -57,6 +57,9 @@ const initChart = () => {
 
   chartInstance = echarts.init(chartContainer.value);
   updateChart();
+
+  // 添加数据加载完成后的回调
+  window.addEventListener('focus', handleDataRefresh);
 };
 
 // 更新图表数据
@@ -97,6 +100,9 @@ const updateChart = () => {
     let count = 0;
     if (typeof item.pomodoroCount === 'number' && !isNaN(item.pomodoroCount)) {
       count = Math.max(0, item.pomodoroCount); // 确保不为负数
+    } else if (typeof item.tomatoHarvests === 'number' && !isNaN(item.tomatoHarvests)) {
+      // 备选字段
+      count = Math.max(0, item.tomatoHarvests);
     }
     return count;
   });
@@ -305,6 +311,15 @@ const updateChart = () => {
   chartInstance.setOption(option);
 };
 
+// 处理数据刷新
+const handleDataRefresh = () => {
+  console.log('触发数据刷新检查');
+  // 如果有新数据，刷新图表
+  if (props.weekData && props.weekData.length > 0) {
+    updateChart();
+  }
+};
+
 // 监听数据变化，更新图表
 watch(() => props.weekData, () => {
   updateChart();
@@ -324,6 +339,7 @@ onMounted(() => {
 // 组件卸载前清理资源
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize);
+  window.removeEventListener('focus', handleDataRefresh);
   chartInstance?.dispose();
   chartInstance = null;
 });

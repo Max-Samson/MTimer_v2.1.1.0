@@ -91,6 +91,26 @@
     @apply border border-[rgb(var(--color-primary))/50%];
   }
 
+  /* 改进AI助手输入框在暗黑模式下的可见度 */
+  :root[data-theme="dark"] .chat-input .n-input__textarea-el {
+    @apply text-gray-100 placeholder-gray-400 bg-gray-700/90 !important;
+
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 10%);
+    caret-color: rgb(var(--color-primary)) !important;
+  }
+
+  :root[data-theme="dark"] .chat-input .n-input__textarea-el:focus {
+    @apply ring-2 ring-indigo-500/50 !important;
+
+    border-color: rgb(var(--color-primary) 0.5) !important;
+  }
+
+  :root[data-theme="dark"] .chat-input .n-input__textarea-el::placeholder {
+    @apply text-gray-400 !important;
+
+    opacity: 0.7;
+  }
+
   :root[data-theme="dark"] .n-drawer-content {
     @apply border-l border-white/5 bg-[rgb(25,30,40)/95%] shadow-lg;
   }
@@ -184,4 +204,122 @@
 
 .chat-history {
   @apply flex flex-1 flex-col gap-4 overflow-y-auto p-4;
+}
+
+/* 优化AI助手界面在黑暗模式下的样式 */
+:root[data-theme="dark"] .ai-chat-container {
+  @apply bg-gray-800/95 border-gray-700 shadow-lg shadow-gray-900/30;
+}
+
+:root[data-theme="dark"] .input-area {
+  @apply bg-gray-800/80 border-gray-700/80;
+}
+
+/* 输入框焦点状态增强 */
+:root[data-theme="dark"] .chat-input {
+  @apply bg-gray-700/90 border-gray-600 focus-within:ring-2 focus-within:ring-indigo-500/50 focus-within:border-indigo-400;
+
+  transition: all 0.3s ease;
+}
+
+:root[data-theme="dark"] .chat-input:hover {
+  @apply shadow-md shadow-indigo-500/10;
+}
+
+/* 更好的对比度和可视性 */
+:root[data-theme="dark"] .ai-assistant-view {
+  @apply from-gray-900 to-indigo-950/40 bg-gradient-to-br;
+}
+
+/* 思考中动画改进 */
+:root[data-theme="dark"] .thinking-container {
+  @apply bg-indigo-900/30 border border-indigo-800/50;
+}
+
+:root[data-theme="dark"] .example-prompt {
+  @apply bg-gray-800/80 border-gray-700 hover:bg-indigo-900/40 hover:border-indigo-700;
+}
+
+/* 改进文本可读性 */
+:root[data-theme="dark"] .message-body,
+:root[data-theme="dark"] .task-preview {
+  @apply text-gray-100;
+}
+
+/* 更多AI助手相关动画效果 */
+.message-enter-left {
+  animation: slide-in-from-left 0.3s ease-out;
+}
+
+.message-enter-right {
+  animation: slide-in-from-right 0.3s ease-out;
+}
+
+@keyframes slide-in-from-left {
+  0% {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-in-from-right {
+  0% {
+    opacity: 0;
+    transform: translateX(10px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 黑暗模式下AI图标发光效果 */
+:root[data-theme="dark"] .ai-chat-container .n-avatar {
+  transition: all 0.5s ease;
+}
+
+:root[data-theme="dark"] .ai-chat-container .message-bubble:hover .n-avatar {
+  box-shadow: 0 0 12px rgb(99 102 241 / 50%);
+}
+
+/* 改进黑暗模式下的按钮悬停效果 */
+:root[data-theme="dark"] .chat-input:focus-within {
+  animation: focus-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes focus-glow {
+  from {
+    box-shadow: 0 0 5px rgb(99 102 241 / 30%);
+  }
+
+  to {
+    box-shadow: 0 0 15px rgb(99 102 241 / 60%);
+  }
+}
+
+/* 黑暗模式下的思考动画增强版 */
+:root[data-theme="dark"] .thinking-container-enhanced {
+  overflow: hidden;
+  position: relative;
+}
+
+:root[data-theme="dark"] .thinking-container-enhanced::after {
+  animation: shimmer 2s infinite;
+  background: linear-gradient(to right, transparent, rgb(99 102 241 / 10%), transparent);
+  content: '';
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
 }

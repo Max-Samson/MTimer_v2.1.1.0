@@ -27,7 +27,7 @@
       <!-- 消息列表 - 使用固定高度和滚动条 -->
       <div class="message-list flex-1 overflow-y-auto p-4 min-h-0" ref="chatHistoryRef">
         <!-- 加载状态 - 改进的思考动画 -->
-        <div v-if="isLoading" class="thinking-container flex items-center gap-3 p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-lg my-4 animate-pulse">
+        <div v-if="isLoading" class="thinking-container thinking-container-enhanced flex items-center gap-3 p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-lg my-4 animate-pulse">
           <n-spin size="small" />
           <div class="thinking-dots flex gap-1">
             <span class="dot animate-bounce">·</span>
@@ -103,7 +103,7 @@
             placeholder="描述你想要完成的任务，或者问任何问题..."
             @keydown.enter.exact.prevent="handleSend"
             :disabled="isLoading"
-            class="chat-input bg-white dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-300"
+            class="chat-input bg-white dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 focus-within:ring-2 focus-within:ring-indigo-500/50 dark:focus-within:ring-indigo-400/60"
           />
 
           <div class="input-actions flex justify-between items-center mt-3">
@@ -136,7 +136,7 @@
                 :disabled="!inputText.trim() || isLoading"
                 @click="handleSend"
                 :loading="isLoading"
-                class="bg-indigo-500 hover:bg-indigo-600 text-white transition-all duration-300 transform hover:-translate-y-1 shadow-md hover:shadow-lg"
+                class="bg-indigo-500 hover:bg-indigo-600 text-white transition-all duration-300 transform hover:-translate-y-1 shadow-md hover:shadow-lg dark:shadow-indigo-500/30"
               >
                 <template #icon>
                   <n-icon><Send /></n-icon>

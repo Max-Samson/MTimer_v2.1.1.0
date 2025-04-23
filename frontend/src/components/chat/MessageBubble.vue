@@ -3,8 +3,8 @@
     :class="[
       'flex w-full px-4 py-3 items-start gap-4 border-b transition-all duration-300',
       isUser
-        ? 'flex-row-reverse bg-indigo-50/70 dark:bg-indigo-900/30 border-gray-100 dark:border-gray-700/50 message-enter-right'
-        : 'border-gray-100 dark:border-gray-700/50 message-enter-left'
+        ? 'flex-row-reverse bg-indigo-50/70 dark:bg-indigo-900/40 border-gray-100 dark:border-gray-700/40 message-enter-right'
+        : 'border-gray-100 dark:border-gray-700/40 message-enter-left'
     ]"
   >
     <!-- 角色标识和头像 -->
@@ -15,7 +15,7 @@
           round
           :size="36"
           :style="{ backgroundColor: '#6366f1' }"
-          class="shadow-md"
+          class="shadow-md dark:shadow-indigo-500/20"
         >
           <template #icon>
             <n-icon><Bot /></n-icon>
@@ -26,7 +26,7 @@
           round
           :size="36"
           :style="{ backgroundColor: '#10b981' }"
-          class="shadow-md"
+          class="shadow-md dark:shadow-green-500/20"
         >
           <template #icon>
             <n-icon><UserAvatar /></n-icon>
@@ -43,12 +43,12 @@
         :class="[
           'rounded-lg p-4 shadow-sm transition-all duration-300 hover:shadow-md',
           isUser
-            ? 'bg-green-100 dark:bg-green-900/30 text-gray-800 dark:text-gray-100 rounded-tr-none'
-            : 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-tl-none'
+            ? 'bg-green-100 dark:bg-green-900/50 text-gray-800 dark:text-gray-100 rounded-tr-none dark:shadow-green-900/20'
+            : 'bg-gray-100 dark:bg-gray-800/90 text-gray-800 dark:text-gray-100 rounded-tl-none dark:shadow-indigo-900/10'
         ]"
       >
         <!-- 如果有图片，显示图片 -->
-        <div v-if="image" class="mb-3 rounded-lg overflow-hidden shadow transition-all duration-300 hover:shadow-md">
+        <div v-if="image" class="mb-3 rounded-lg overflow-hidden shadow transition-all duration-300 hover:shadow-md dark:shadow-gray-900/30">
           <img
             :src="image"
             :alt="`${isUser ? '用户' : 'AI助手'}上传的图片`"
@@ -74,7 +74,7 @@
         <div v-if="!isUser" class="flex gap-1 message-actions-buttons">
           <n-tooltip trigger="hover">
             <template #trigger>
-              <n-button circle size="tiny" class="text-gray-500 hover:text-indigo-500 dark:text-gray-400 dark:hover:text-indigo-400 transform transition-all duration-300 hover:-translate-y-0.5" @click="copyMessage">
+              <n-button circle size="tiny" class="text-gray-500 hover:text-indigo-500 dark:text-gray-400 dark:hover:text-indigo-400 transform transition-all duration-300 hover:-translate-y-0.5 dark:hover:shadow dark:hover:shadow-indigo-500/30" @click="copyMessage">
                 <n-icon><Copy /></n-icon>
               </n-button>
             </template>
@@ -88,7 +88,7 @@
                 size="tiny"
                 :class="[
                   'transform transition-all duration-300 hover:-translate-y-0.5',
-                  liked ? 'text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400'
+                  liked ? 'text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/40 dark:shadow dark:shadow-green-500/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 dark:hover:shadow dark:hover:shadow-indigo-500/30'
                 ]"
                 @click="toggleLike"
               >
@@ -105,7 +105,7 @@
                 size="tiny"
                 :class="[
                   'transform transition-all duration-300 hover:-translate-y-0.5',
-                  disliked ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400'
+                  disliked ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/40 dark:shadow dark:shadow-red-500/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 dark:hover:shadow dark:hover:shadow-indigo-500/30'
                 ]"
                 @click="toggleDislike"
               >
@@ -117,7 +117,7 @@
 
           <n-tooltip trigger="hover">
             <template #trigger>
-              <n-button circle size="tiny" class="text-gray-500 hover:text-indigo-500 dark:text-gray-400 dark:hover:text-indigo-400 transform transition-all duration-300 hover:-translate-y-0.5" @click="regenerateResponse">
+              <n-button circle size="tiny" class="text-gray-500 hover:text-indigo-500 dark:text-gray-400 dark:hover:text-indigo-400 transform transition-all duration-300 hover:-translate-y-0.5 dark:hover:shadow dark:hover:shadow-indigo-500/30" @click="regenerateResponse">
                 <n-icon><Reset /></n-icon>
               </n-button>
             </template>
@@ -137,10 +137,10 @@
     :bordered="false"
     :segmented="true"
     transform-origin="center"
-    class="image-preview-modal"
+    class="image-preview-modal dark:bg-gray-800 dark:text-gray-100"
   >
     <template #header-extra>
-      <n-button text @click="downloadImage" class="transition-transform duration-200 hover:-translate-y-0.5">
+      <n-button text @click="downloadImage" class="transition-transform duration-200 hover:-translate-y-0.5 dark:text-indigo-400">
         <template #icon>
           <n-icon><Download /></n-icon>
         </template>
@@ -245,71 +245,72 @@ function formatContentToHTML(content: string): string {
   // 移除可能包含的JSON代码块（适用于任务数据）
   content = content.replace(/```json\s*([\s\S]*?)```/g, '');
 
-  // 移除空行（由于删除代码块可能导致的）
-  content = content.replace(/\n\s*\n/g, '\n\n');
-
   // 处理代码块（保留非JSON的代码块）
-  content = content.replace(/```([a-z]+)\n([\s\S]*?)```/g, function(match, lang, code) {
+  content = content.replace(/```([a-z]*)\s*([\s\S]*?)```/g, function(match, lang, code) {
     if (lang.toLowerCase() === 'json') {
       return ''; // 移除JSON代码块
     }
-    return '<pre class="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-x-auto"><code class="language-' + lang + '">' + code + '</code></pre>';
+    return '<pre class="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-x-auto my-2"><code class="language-' + lang + '">' + code + '</code></pre>';
   });
 
-  // 处理行内代码
-  content = content.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">$1</code>');
-
-  // 处理链接
-  content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-indigo-600 dark:text-indigo-400 hover:underline">$1</a>');
-
-  // 处理粗体
-  content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-  // 处理斜体
-  content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-
-  // 处理标题
+  // 处理标题 (h1-h3)
   content = content.replace(/^### (.*?)$/gm, '<h3 class="text-lg font-bold my-2">$1</h3>');
   content = content.replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold my-3">$1</h2>');
   content = content.replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>');
 
-  // 处理列表
-  content = content.replace(/^\d+\. (.*?)$/gm, '<li class="ml-6 list-decimal">$1</li>');
-  content = content.replace(/^- (.*?)$/gm, '<li class="ml-6 list-disc">$1</li>');
+  // 增强数字序号显示效果（仅处理没有空格缩进的一级序号）
+  content = content.replace(/^(\d+)\.\s+(.+)$/gm, function(match, num, text) {
+    // 防止误处理代码示例中的数字点号
+    if (match.trim().startsWith('```') || match.includes('<pre') || match.includes('<code')) {
+      return match;
+    }
+    return `<div class="numbered-item"><span class="number-badge">${num}</span><span class="number-content">${text}</span></div>`;
+  });
 
-  // 检测并包装列表项
-  const hasOrderedList = content.includes('<li class="ml-6 list-decimal">');
-  const hasUnorderedList = content.includes('<li class="ml-6 list-disc">');
+  // 处理嵌套的数字序号（有空格缩进的序号）
+  content = content.replace(/^(\s+)(\d+)\.\s+(.+)$/gm, function(match, indent, num, text) {
+    // 防止误处理代码示例中的数字点号
+    if (match.trim().startsWith('```') || match.includes('<pre') || match.includes('<code')) {
+      return match;
+    }
+    return `${indent}<div class="nested-numbered-item"><span class="nested-number-badge">${num}</span><span class="number-content">${text}</span></div>`;
+  });
 
-  if (hasOrderedList) {
-    // 包装有序列表
-    content = content.replace(
-      /(<li class="ml-6 list-decimal">.*?<\/li>)+/g,
-      match => `<ol class="list-decimal pl-4 my-2">${match}</ol>`
-    );
-  }
+  // 无序列表处理
+  content = content.replace(/^- (.+)$/gm, '<li class="ml-5 list-disc">$1</li>');
 
-  if (hasUnorderedList) {
-    // 包装无序列表
-    content = content.replace(
-      /(<li class="ml-6 list-disc">.*?<\/li>)+/g,
-      match => `<ul class="list-disc pl-4 my-2">${match}</ul>`
-    );
-  }
+  // 将连续的无序列表项包装在ul标签中
+  content = content.replace(/(<li class="ml-5 list-disc">.*?<\/li>)+/gs, function(match) {
+    return `<ul class="list-disc pl-4 my-2">${match}</ul>`;
+  });
 
-  // 处理段落和换行
-  content = content.replace(/\n\n/g, '</p><p class="my-2">');
-  content = content.replace(/\n/g, '<br>');
+  // 处理引用块
+  content = content.replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-1 my-2 text-gray-700 dark:text-gray-300 italic">$1</blockquote>');
 
-  // 包装在段落标签中
-  if (!content.startsWith('<h1') && !content.startsWith('<h2') && !content.startsWith('<h3') &&
-      !content.startsWith('<ol') && !content.startsWith('<ul') && !content.startsWith('<p')) {
-    content = '<p class="my-2">' + content + '</p>';
-  }
+  // 转换超链接
+  content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-indigo-600 dark:text-indigo-400 hover:underline">$1</a>');
 
-  // 修复可能的嵌套标签问题
-  content = content.replace(/<p class="my-2"><(h[1-3]|ol|ul|li)/g, '<$1');
-  content = content.replace(/<\/(h[1-3]|ol|ul|li)><\/p>/g, '</$1>');
+  // 转换粗体
+  content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+  // 转换斜体
+  content = content.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+  // 转换行内代码段
+  content = content.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
+
+  // 转换双换行为段落
+  content = content.split(/\n\s*\n/).map(p => {
+    // 跳过已经是HTML标签的内容
+    if (p.startsWith('<h') || p.startsWith('<pre') || p.startsWith('<ul') ||
+        p.startsWith('<blockquote') || p.startsWith('<div class="numbered-item')) {
+      return p;
+    }
+    return `<p>${p}</p>`;
+  }).join('\n\n');
+
+  // 处理段落内的单换行
+  content = content.replace(/([^>])\n([^<])/g, '$1<br>$2');
 
   return content;
 }
@@ -318,11 +319,11 @@ function formatContentToHTML(content: string): string {
 <style scoped>
 /* 消息进入动画 */
 .message-enter-left {
-  animation: slideInLeft 0.3s ease-out;
+  animation: slideInLeft 0.3s ease-out forwards;
 }
 
 .message-enter-right {
-  animation: slideInRight 0.3s ease-out;
+  animation: slideInRight 0.3s ease-out forwards;
 }
 
 @keyframes slideInLeft {
@@ -345,6 +346,103 @@ function formatContentToHTML(content: string): string {
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+/* 数字编号样式 */
+:deep(.numbered-item) {
+  display: flex;
+  align-items: flex-start;
+  margin: 10px 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background-color: rgba(99, 102, 241, 0.03);
+}
+
+:deep(.numbered-item:hover) {
+  background-color: rgba(99, 102, 241, 0.08);
+  transform: translateX(2px);
+}
+
+:deep(.number-badge) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  background-color: #6366f1;
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  margin-right: 12px;
+  font-size: 15px;
+  box-shadow: 0 2px 4px rgba(99, 102, 241, 0.3);
+  flex-shrink: 0;
+  transform: translateY(-1px);
+}
+
+:deep(.nested-numbered-item) {
+  display: flex;
+  align-items: flex-start;
+  margin: 8px 0 8px 24px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  background-color: rgba(129, 140, 248, 0.03);
+}
+
+:deep(.nested-numbered-item:hover) {
+  background-color: rgba(129, 140, 248, 0.08);
+  transform: translateX(2px);
+}
+
+:deep(.nested-number-badge) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  background-color: #818cf8;
+  color: white;
+  font-weight: bold;
+  border-radius: 50%;
+  margin-right: 10px;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(129, 140, 248, 0.3);
+  flex-shrink: 0;
+}
+
+:deep(.number-content) {
+  flex: 1;
+  padding-top: 3px;
+  line-height: 1.5;
+}
+
+/* 暗黑模式适配 */
+:deep(.dark .numbered-item) {
+  background-color: rgba(99, 102, 241, 0.05);
+}
+
+:deep(.dark .numbered-item:hover) {
+  background-color: rgba(99, 102, 241, 0.12);
+}
+
+:deep(.dark .number-badge) {
+  background-color: #818cf8;
+  box-shadow: 0 2px 4px rgba(129, 140, 248, 0.5);
+}
+
+:deep(.dark .nested-numbered-item) {
+  background-color: rgba(129, 140, 248, 0.05);
+}
+
+:deep(.dark .nested-numbered-item:hover) {
+  background-color: rgba(129, 140, 248, 0.12);
+}
+
+:deep(.dark .nested-number-badge) {
+  background-color: #a5b4fc;
+  box-shadow: 0 1px 3px rgba(165, 180, 252, 0.5);
 }
 
 /* 图片预览模态框动画 */
@@ -436,5 +534,11 @@ function formatContentToHTML(content: string): string {
 .message-actions-buttons {
   display: flex;
   gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.message-item:hover .message-actions-buttons {
+  opacity: 1;
 }
 </style>
