@@ -65,6 +65,10 @@ import { nextTick } from 'vue'
 import type { Todo } from './services/DatabaseService'
 import TestDataGenerator from './services/TestDataGenerator'
 
+// 导入全局样式
+import './assets/styles/variables.css'
+import './assets/styles/components.css'
+
 const naive = create({
   components: [
     NButton,

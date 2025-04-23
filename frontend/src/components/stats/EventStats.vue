@@ -77,22 +77,29 @@
 
       <!-- 图表区域 -->
       <div class="charts-container">
-        <!-- 完成率环形图 -->
+        <!-- 任务完成率图 -->
         <div class="chart-wrapper">
-          <h4 class="chart-title">事件完成率</h4>
-          <div v-if="!chartVisible || (stats.totalEvents === 0 && parseFloat(stats.completionRate.replace('%', '')) === 0)" class="empty-chart">
+          <h4 class="chart-title">任务完成率</h4>
+          <div v-if="!hasData" class="empty-chart">
             <p>暂无完成率数据</p>
           </div>
           <div v-else ref="completionRateChart" class="chart"></div>
         </div>
 
-        <!-- 工作量趋势图 -->
+        <!-- 工作量趋势图 - 使用BaseChart组件 -->
         <div class="chart-wrapper">
           <h4 class="chart-title">工作量趋势</h4>
-          <div v-if="!chartVisible || !stats.trendData || stats.trendData.length === 0" class="empty-chart">
+          <BaseChart
+            v-if="stats.trendData && stats.trendData.length > 0"
+            :option="getTrendChartOption()"
+            :loading="loading"
+            :isEmpty="!stats.trendData || stats.trendData.length === 0"
+            type="line"
+            componentName="EventStatsTrendChart"
+          />
+          <div v-else class="empty-chart">
             <p>暂无趋势数据</p>
           </div>
-          <div v-else ref="workloadTrendChart" class="chart"></div>
         </div>
       </div>
     </div>
@@ -111,6 +118,11 @@ import {
 } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import dbService, { EventStatsResponse } from '../../services/DatabaseService';
+import { useAutoRefresh } from '../../hooks/useAutoRefresh';
+import { formatMinutes, formatDateShort } from '../../utils/formatters';
+import { logger } from '../../utils/logger';
+import BaseChart from '../common/BaseChart.vue';
+import { useChartsTheme } from '../../hooks/useChartsTheme';
 
 // 注册必要的组件
 echarts.use([
@@ -187,6 +199,11 @@ const stats = reactive<EventStatsResponse>({
   trendData: []
 });
 
+// 使用图表主题
+const {
+  getLineChartOption
+} = useChartsTheme();
+
 // 检查是否有数据
 const hasData = computed(() => {
   // 添加调试日志
@@ -205,17 +222,6 @@ const hasData = computed(() => {
   // 放宽条件，在有趋势数据的情况下，不再检查数据是否都为0
   return hasTotalEvents || hasTrendData;
 });
-
-// 格式化分钟为时:分格式
-const formatMinutes = (minutes: number): string => {
-  if (minutes === 0) return '0分钟';
-
-  const hours = Math.floor(minutes / 60);
-  const mins = minutes % 60;
-  return hours > 0
-    ? `${hours}小时${mins > 0 ? mins + '分钟' : ''}`
-    : `${mins}分钟`;
-};
 
 // 检查当前主题
 const isDarkTheme = computed(() => {
@@ -426,44 +432,138 @@ const forceStopLoading = () => {
   setGlobalError?.('数据加载超时，显示示例数据');
 };
 
-// 开启自动刷新
-const startAutoRefresh = () => {
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
+// 使用自动刷新Hook
+const {
+  isRefreshing,
+  refresh: refreshData,
+  isAutoRefreshEnabled,
+  toggleAutoRefresh
+} = useAutoRefresh(loadData, {
+  componentName: 'EventStats',
+  interval: 5 * 60 * 1000, // 5分钟刷新一次
+  enableFocusRefresh: true,
+  initialRefresh: true
+});
+
+// 切换时间过滤器
+const changeTimeFilter = (filterValue: string) => {
+  currentFilter.value = filterValue;
+
+  // 设置日期范围
+  const today = new Date();
+  switch (filterValue) {
+    case '7days':
+      startDate.value = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      endDate.value = today.toISOString().split('T')[0];
+      break;
+    case '30days':
+      startDate.value = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      endDate.value = today.toISOString().split('T')[0];
+      break;
+    case 'thisMonth':
+      startDate.value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+      endDate.value = today.toISOString().split('T')[0];
+      break;
+    // 自定义日期不需要在这里设置
   }
 
-  // 设置更长的刷新间隔（5分钟），减少频繁刷新引起的数据波动
-  refreshTimer = window.setInterval(() => {
-    console.log('自动刷新事件统计数据...');
-    // 检查当前日期是否包含在选定范围内
-    const today = new Date().toISOString().split('T')[0];
-    if (today >= startDate.value && today <= endDate.value) {
-      console.log('当前日期在选定范围内，执行刷新');
-      loadData();
-    } else {
-      console.log('当前日期不在选定范围内，跳过刷新');
-    }
-  }, 300000); // 5分钟刷新一次
-
-  autoRefresh.value = true;
+  // 加载数据
+  loadData();
 };
 
-// 停止自动刷新
-const stopAutoRefresh = () => {
+// 窗口大小改变时重绘图表
+const handleResize = () => {
+  completionRateChartInstance?.resize();
+  workloadTrendChartInstance?.resize();
+};
+
+window.addEventListener('resize', handleResize);
+
+// 组件卸载时移除事件监听
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', handleResize);
+  document.documentElement.removeEventListener('data-theme-changed', updateChartsTheme);
+
+  // 清除自动刷新定时器
   if (refreshTimer) {
     clearInterval(refreshTimer);
     refreshTimer = null;
   }
 
-  autoRefresh.value = false;
+  // 销毁图表实例
+  completionRateChartInstance?.dispose();
+  workloadTrendChartInstance?.dispose();
+
+  // 清除加载状态
+  setGlobalLoading?.(false);
+  setGlobalError?.('');
+});
+
+// 初始化和刷新图表
+const refreshCharts = () => {
+  console.log('强制刷新图表');
+
+  // 强制设置图表可见
+  chartVisible.value = true;
+
+  // 销毁现有图表实例
+  if (completionRateChartInstance) {
+    completionRateChartInstance.dispose();
+    completionRateChartInstance = null;
+  }
+
+  if (workloadTrendChartInstance) {
+    workloadTrendChartInstance.dispose();
+    workloadTrendChartInstance = null;
+  }
+
+  // 确保有数据可以显示
+  const hasDataToShow = stats.totalEvents > 0 || (stats.trendData && stats.trendData.length > 0);
+  if (!hasDataToShow) {
+    console.log('无数据可以显示，生成演示数据');
+    // 生成一些演示数据用于显示
+    forceStopLoading();
+    return;
+  }
+
+  // 立即初始化图表，不依赖于nextTick
+  setTimeout(() => {
+    console.log('开始初始化图表...');
+
+    // 强制初始化完成率图表
+    if (completionRateChart.value && parseFloat(stats.completionRate.replace('%', '')) > 0) {
+      try {
+        console.log('初始化完成率图表');
+        initCompletionRateChart();
+      } catch (e) {
+        console.error('初始化完成率图表失败:', e);
+      }
+    }
+
+    // 强制初始化趋势图表
+    if (workloadTrendChart.value && stats.trendData && stats.trendData.length > 0) {
+      try {
+        console.log('初始化趋势图表');
+        initWorkloadTrendChart();
+      } catch (e) {
+        console.error('初始化趋势图表失败:', e);
+      }
+    }
+
+    // 触发窗口resize事件以确保图表正确渲染
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 100);
+  }, 200);
 };
 
-// 切换自动刷新状态
-const toggleAutoRefresh = () => {
-  if (autoRefresh.value) {
-    stopAutoRefresh();
-  } else {
-    startAutoRefresh();
+// 更新图表函数
+const updateChart = () => {
+  if (completionRateChartInstance) {
+    initCompletionRateChart();
+  }
+  if (workloadTrendChartInstance) {
+    initWorkloadTrendChart();
   }
 };
 
@@ -605,328 +705,33 @@ const initWorkloadTrendChart = () => {
     console.log('开始初始化工作量趋势图');
     workloadTrendChartInstance = echarts.init(workloadTrendChart.value);
 
-    // 准备数据
-    const dates = stats.trendData.map(item => {
-      if (!item.date) {
-        console.warn('趋势数据中存在无日期记录:', item);
-        return '未知日期';
-      }
-      // 简化日期显示，只保留月/日格式
-      const dateParts = item.date.split('-');
-      if (dateParts.length >= 3) {
-        return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`;
-      }
-      return item.date.substring(5).replace('-', '/');
-    });
+    // 获取趋势图表选项
+    const getTrendChartOption = () => {
+      // 准备数据
+      const dates = stats.trendData.map(item => formatDateShort(item.date || ''));
+      const focusData = stats.trendData.map(item => item.totalFocusMinutes || 0);
 
-    const focusData = stats.trendData.map(item => {
-      const minutes = item.totalFocusMinutes || 0;
-      console.log(`日期 ${item.date} 的专注时长: ${minutes}分钟`);
-      return minutes;
-    });
-
-    // 检查数据有效性，避免全0数据
-    const hasValidData = focusData.some(value => value > 0);
-    if (!hasValidData) {
-      console.warn('所有专注时长数据均为0，使用默认图表数据');
-      // 可以添加一些示例数据，以便显示图表而不是空白
-      focusData.fill(1); // 填充1分钟的数据，确保图表能够显示
-    }
-
-    // 找到最大值，设置合适的Y轴范围
-    const maxValue = Math.max(...focusData, 60);
-
-    // 主题适配的颜色
-    const textColor = isDarkTheme.value ? '#E5EAF3' : '#606266';
-    const lineColor = '#3A82F6';
-    const axisFontColor = isDarkTheme.value ? '#909399' : '#666';
-    const axisLineColor = isDarkTheme.value ? '#4C5D7A' : '#ddd';
-    const splitLineColor = isDarkTheme.value ? 'rgba(76, 93, 122, 0.2)' : 'rgba(220, 220, 220, 0.5)';
-    const areaColorTop = 'rgba(58, 130, 246, 0.6)';
-    const areaColorBottom = isDarkTheme.value ? 'rgba(58, 130, 246, 0.1)' : 'rgba(58, 130, 246, 0.05)';
-    const backgroundColor = isDarkTheme.value ? '#252D3C' : 'transparent';
-
-    // 配置选项
-    const option = {
-      backgroundColor: backgroundColor,
-      tooltip: {
-        trigger: 'axis',
-        formatter: function(params: Array<any>) {
-          let result = params[0].name + '<br/>';
-          params.forEach((item: any) => {
-            result += item.seriesName + ': ' + formatMinutes(item.value) + '<br/>';
-          });
-          return result;
-        },
-        textStyle: {
-          color: textColor
-        }
-      },
-      grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '5%',
-        top: '5%',
-        containLabel: true
-      },
-      xAxis: {
-        type: 'category',
-        boundaryGap: false,
-        data: dates,
-        axisLabel: {
-          formatter: '{value}',
-          color: axisFontColor
-        },
-        axisLine: {
-          lineStyle: {
-            color: axisLineColor
-          }
-        },
-        axisTick: {
-          alignWithLabel: true,
-          lineStyle: {
-            color: axisLineColor
-          }
-        }
-      },
-      yAxis: {
-        type: 'value',
-        min: 0,
-        max: Math.ceil(maxValue * 1.2 / 60) * 60, // 向上取整小时
-        axisLabel: {
-          formatter: (value: number) => {
-            return Math.floor(value / 60) + 'h';
-          },
-          color: axisFontColor
-        },
-        axisLine: {
-          lineStyle: {
-            color: axisLineColor
-          }
-        },
-        splitLine: {
-          lineStyle: {
-            color: splitLineColor,
-            type: 'dashed'
-          }
-        }
-      },
-      series: [
-        {
-          name: '专注时长',
-          type: 'line',
-          data: focusData,
-          areaStyle: {
-            color: {
-              type: 'linear',
-              x: 0,
-              y: 0,
-              x2: 0,
-              y2: 1,
-              colorStops: [
-                {
-                  offset: 0,
-                  color: areaColorTop
-                },
-                {
-                  offset: 1,
-                  color: areaColorBottom
-                }
-              ]
-            }
-          },
-          itemStyle: {
-            color: lineColor,
-            borderWidth: 2
-          },
-          lineStyle: {
-            width: 3
-          },
-          smooth: true,
-          symbolSize: 7,
-          emphasis: {
-            scale: true,
-            itemStyle: {
-              borderColor: isDarkTheme.value ? '#fff' : lineColor,
-              borderWidth: 2
-            }
-          }
-        }
-      ],
-      animationDuration: 1000
+      // 使用useChartsTheme返回的工具函数生成图表选项
+      return getLineChartOption({
+        dates,
+        data: focusData,
+        name: '专注时长',
+        yAxisFormatter: (value) => `${Math.floor(value / 60)}h`
+      });
     };
 
     // 设置选项并渲染
-    workloadTrendChartInstance.setOption(option);
+    workloadTrendChartInstance.setOption(getTrendChartOption());
     console.log('工作量趋势图初始化完成');
   } catch (e) {
     console.error('初始化工作量趋势图时出错:', e);
   }
 };
 
-// 切换时间过滤器
-const changeTimeFilter = (filterValue: string) => {
-  currentFilter.value = filterValue;
-
-  // 设置日期范围
-  const today = new Date();
-  switch (filterValue) {
-    case '7days':
-      startDate.value = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      endDate.value = today.toISOString().split('T')[0];
-      break;
-    case '30days':
-      startDate.value = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      endDate.value = today.toISOString().split('T')[0];
-      break;
-    case 'thisMonth':
-      startDate.value = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
-      endDate.value = today.toISOString().split('T')[0];
-      break;
-    // 自定义日期不需要在这里设置
-  }
-
-  // 加载数据
-  loadData();
-};
-
-// 窗口大小改变时重绘图表
-const handleResize = () => {
-  completionRateChartInstance?.resize();
-  workloadTrendChartInstance?.resize();
-};
-
-window.addEventListener('resize', handleResize);
-
-// 组件卸载时移除事件监听
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', handleResize);
-  document.documentElement.removeEventListener('data-theme-changed', updateChartsTheme);
-
-  // 清除自动刷新定时器
-  if (refreshTimer) {
-    clearInterval(refreshTimer);
-    refreshTimer = null;
-  }
-
-  // 销毁图表实例
-  completionRateChartInstance?.dispose();
-  workloadTrendChartInstance?.dispose();
-
-  // 清除加载状态
-  setGlobalLoading?.(false);
-  setGlobalError?.('');
-});
-
-// 初始化和刷新图表
-const refreshCharts = () => {
-  console.log('强制刷新图表');
-
-  // 强制设置图表可见
-  chartVisible.value = true;
-
-  // 销毁现有图表实例
-  if (completionRateChartInstance) {
-    completionRateChartInstance.dispose();
-    completionRateChartInstance = null;
-  }
-
-  if (workloadTrendChartInstance) {
-    workloadTrendChartInstance.dispose();
-    workloadTrendChartInstance = null;
-  }
-
-  // 确保有数据可以显示
-  const hasDataToShow = stats.totalEvents > 0 || (stats.trendData && stats.trendData.length > 0);
-  if (!hasDataToShow) {
-    console.log('无数据可以显示，生成演示数据');
-    // 生成一些演示数据用于显示
-    forceStopLoading();
-    return;
-  }
-
-  // 立即初始化图表，不依赖于nextTick
-  setTimeout(() => {
-    console.log('开始初始化图表...');
-
-    // 强制初始化完成率图表
-    if (completionRateChart.value && parseFloat(stats.completionRate.replace('%', '')) > 0) {
-      try {
-        console.log('初始化完成率图表');
-        initCompletionRateChart();
-      } catch (e) {
-        console.error('初始化完成率图表失败:', e);
-      }
-    }
-
-    // 强制初始化趋势图表
-    if (workloadTrendChart.value && stats.trendData && stats.trendData.length > 0) {
-      try {
-        console.log('初始化趋势图表');
-        initWorkloadTrendChart();
-      } catch (e) {
-        console.error('初始化趋势图表失败:', e);
-      }
-    }
-
-    // 触发窗口resize事件以确保图表正确渲染
-    setTimeout(() => {
-      window.dispatchEvent(new Event('resize'));
-    }, 100);
-  }, 200);
-};
-
-// 刷新数据
-const refreshData = () => {
-  loading.value = true;
-  console.log("手动刷新任务统计数据");
-  dataRefreshKey.value++;
-  loadData();
-};
-
-// 设置自动刷新
-const setupAutoRefresh = () => {
-  // 当窗口重新获得焦点时刷新数据
-  window.addEventListener('focus', () => {
-    console.log("窗口获得焦点，自动刷新任务统计数据");
-    refreshData();
-  });
-
-  // 设置定时器定期刷新数据（每5分钟一次）
-  const interval = setInterval(() => {
-    console.log("定时刷新任务统计数据");
-    refreshData();
-  }, 5 * 60 * 1000);
-
-  // 组件卸载时清理
-  onBeforeUnmount(() => {
-    window.removeEventListener('focus', refreshData);
-    clearInterval(interval);
-  });
-};
-
-// 监听刷新键，自动重载数据
-watch(dataRefreshKey, () => {
-  if (dataRefreshKey.value > 0) {
-    loadData();
-  }
-});
-
-// 组件挂载时加载数据
+// 组件挂载时加载数据 - 不再需要，由useAutoRefresh处理
 onMounted(() => {
   loadData();
-  setupAutoRefresh();
 });
-
-// 更新图表函数
-const updateChart = () => {
-  if (completionRateChartInstance) {
-    initCompletionRateChart();
-  }
-  if (workloadTrendChartInstance) {
-    initWorkloadTrendChart();
-  }
-};
 </script>
 
 <style scoped>

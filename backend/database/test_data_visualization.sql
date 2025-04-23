@@ -55,13 +55,14 @@ VALUES
 ('实现消息推送功能', 1, 'pending', datetime('now', '-3 days'), datetime('now'), 6, datetime('now', '-3 days')),
 ('编写系统文档', 0, 'pending', datetime('now', '-1 days'), datetime('now'), 3, datetime('now', '-1 days')),
 ('代码审查和优化', 0, 'pending', datetime('now', '-4 days'), datetime('now'), 4, datetime('now', '-4 days')),
+('优化移动端适配', 1, 'pending', datetime('now', '-2 days'), datetime('now'), 4, datetime('now', '-2 days'));
 ('研究新技术方案', 1, 'pending', datetime('now', '-2 days'), datetime('now'), 7, datetime('now', '-2 days'));
 
 -- 3. 进行中的待办事项
 INSERT INTO todos (name, mode, status, created_at, updated_at, estimated_pomodoros, last_focus_timestamp)
 VALUES
-('实现数据可视化功能', 0, 'inProgress', datetime('now', '-1 days'), datetime('now'), 8, datetime('now', '-1 days')),
-('优化移动端适配', 1, 'pending', datetime('now', '-2 days'), datetime('now'), 4, datetime('now', '-2 days'));
+('实现数据可视化功能', 0, 'inProgress', datetime('now', '-1 days'), datetime('now'), 8, datetime('now', '-1 days'))；
+
 
 -- ==============================================
 -- 二、创建专注会话记录
@@ -210,6 +211,54 @@ SET
     total_break_minutes = total_focus_sessions * (5 + (ABS(RANDOM()) % 6))
 WHERE
     date >= date('now', '-14 days');
+
+-- ==============================================
+-- 四、生成事件统计数据
+-- ==============================================
+
+-- 为每个待办事项创建事件统计记录
+INSERT INTO event_stats (event_id, date, focus_count, total_focus_time, mode, completed)
+SELECT
+    t.todo_id AS event_id,
+    date('now', '-' || (ABS(RANDOM()) % 14) || ' days') AS date,
+    (ABS(RANDOM()) % 5) + 1 AS focus_count, -- 随机1-5次专注
+    ((ABS(RANDOM()) % 5) + 1) * 25 AS total_focus_time, -- 每次专注25分钟
+    t.mode,
+    CASE WHEN t.status = 'completed' THEN 1 ELSE 0 END AS completed
+FROM
+    todos t
+WHERE
+    t.todo_id <= 12; -- 只为前12个待办事项创建统计记录
+
+-- 为部分待办事项创建多天的统计记录（形成连续的趋势）
+INSERT INTO event_stats (event_id, date, focus_count, total_focus_time, mode, completed)
+SELECT
+    t.todo_id AS event_id,
+    date('now', '-' || (7 - i) || ' days') AS date, -- 最近7天的记录
+    CASE
+        WHEN t.status = 'completed' THEN (ABS(RANDOM()) % 3) + 2 -- 已完成任务有更多专注次数
+        ELSE (ABS(RANDOM()) % 2) + 1 -- 未完成任务专注次数较少
+    END AS focus_count,
+    CASE
+        WHEN t.status = 'completed' THEN ((ABS(RANDOM()) % 3) + 2) * 25 -- 已完成任务有更多专注时间
+        ELSE ((ABS(RANDOM()) % 2) + 1) * 25 -- 未完成任务专注时间较少
+    END AS total_focus_time,
+    t.mode,
+    CASE
+        WHEN i >= 5 AND t.status = 'completed' THEN 1 -- 部分任务在后期完成
+        ELSE 0
+    END AS completed
+FROM
+    todos t,
+    (WITH RECURSIVE counter(i) AS (
+        SELECT 0
+        UNION ALL
+        SELECT i+1 FROM counter
+        WHERE i < 6
+    )
+    SELECT i FROM counter) AS days
+WHERE
+    t.todo_id <= 6; -- 只为前6个待办事项创建多天记录
 
 -- ==============================================
 -- 测试数据创建完成
