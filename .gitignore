@@ -19,6 +19,7 @@
 /frontend/.vite/
 /frontend/.cache/
 /frontend/node_modules/
+/frontend/src/tests
 
 # --- 后端相关 ---
 /.idea/
@@ -35,8 +36,6 @@
 *.sqlite3
 
 # --- 音频/媒体文件（建议用 Git LFS 或外部存储） ---
-*.wav
-*.mp3
 *.ogg
 *.mp4
 *.mov
