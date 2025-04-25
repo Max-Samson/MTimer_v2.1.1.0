@@ -1,7 +1,15 @@
 <!-- 昨日小结组件 -->
 <template>
   <div class="daily-summary">
-    <div class="section-header">昨日小结</div>
+    <div class="stats-header">
+      <div class="section-header">昨日小结</div>
+      <!-- 添加静态刷新按钮 -->
+      <button class="refresh-btn" @click="refreshData" :disabled="loading">
+        <i class="refresh-icon" v-if="!loading">🔄</i>
+        <span v-if="loading" class="loading-spinner-small"></span>
+        <span v-else>刷新</span>
+      </button>
+    </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
@@ -12,9 +20,7 @@
     <!-- 无数据状态 -->
     <div v-else-if="!hasSummaryData" class="empty-container">
       <n-empty description="暂无专注数据" size="small">
-        <template #extra>
-          <n-button size="small" @click="refreshData">刷新数据</n-button>
-        </template>
+        <!-- 移除这里的刷新按钮，因为已经在顶部添加了 -->
       </n-empty>
     </div>
 
@@ -176,7 +182,10 @@ const fetchData = async () => {
     console.error('获取统计数据失败:', error);
     weekTrend.value = []; // 错误时重置数据
   } finally {
-    loading.value = false;
+    // 使用setTimeout确保DOM更新和数据绑定完成后再结束加载状态
+    setTimeout(() => {
+      loading.value = false;
+    }, 300);
   }
 };
 
@@ -211,8 +220,16 @@ const setupAutoRefresh = () => {
 
 // 组件挂载时获取数据
 onMounted(() => {
-  fetchData();
-  setupAutoRefresh();
+  // 使用setTimeout确保DOM已渲染
+  setTimeout(() => {
+    console.log('DailySummary组件已挂载，开始获取数据');
+    fetchData().then(() => {
+      console.log('初始数据加载完成');
+    }).catch(error => {
+      console.error('初始数据加载失败:', error);
+    });
+    setupAutoRefresh();
+  }, 100);
 });
 </script>
 
@@ -221,10 +238,16 @@ onMounted(() => {
   padding: 20px;
 }
 
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
 .section-header {
   font-size: 18px;
-  font-weight: 500;
-  margin-bottom: 20px;
+  font-weight: 600;
   color: #333;
 }
 
@@ -299,8 +322,62 @@ onMounted(() => {
   margin-top: 10px;
 }
 
+/* 刷新按钮样式 */
+.refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-icon {
+  font-size: 14px;
+  /* 移除旋转动画 */
+}
+
+.loading-spinner-small {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #333;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 深色主题适配 */
 :root[data-theme="dark"] .section-header {
-  color: #E5EAF3;
+  color: #e5eaf3;
+}
+
+:root[data-theme="dark"] .refresh-btn {
+  background-color: #252d3c;
+  border-color: #4c5d7a;
+  color: #e5eaf3;
+}
+
+:root[data-theme="dark"] .loading-spinner-small {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: #e5eaf3;
 }
 
 :root[data-theme="dark"] .summary-item {

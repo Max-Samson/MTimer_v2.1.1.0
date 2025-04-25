@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { h, ref, inject, nextTick, onMounted, onUnmounted, computed } from 'vue'
+import { h, ref, inject, nextTick, onMounted, onUnmounted, computed, provide } from 'vue'
 import { NLayout, NLayoutHeader, NLayoutContent, NSpace, NButton, NIcon, darkTheme, NTooltip, NDrawer, NDrawerContent, NTabPane, NTabs, NDropdown } from 'naive-ui'
 import { RouterView, useRouter } from 'vue-router'
 import TomatoTimer from '../components/TomatoTimer.vue'
@@ -10,9 +10,27 @@ import StatisticsView from '../views/StatisticsView.vue'
 import AIAssistantView from '../views/AIAssistantView.vue'
 import MusicPlayer from '../components/MusicPlayer.vue'
 import MiniMusicController from '../components/MiniMusicController.vue'
-import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task, Rocket } from '@vicons/carbon'
+import PomodoroInfoModal from '../components/PomodoroInfoModal.vue'
+import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task, Rocket, Help } from '@vicons/carbon'
 import { useSettingsStore, useTimerStore, useTodoStore } from '../stores'
 import { storeToRefs } from 'pinia'
+import mitt, { Emitter } from 'mitt'
+
+// 定义事件类型
+type Events = {
+  'show-pomodoro-info': void;
+  [key: string]: any;
+}
+
+// 创建类型化的事件总线
+const emitter: Emitter<Events> = mitt()
+// 提供事件总线给子组件
+provide('emitter', emitter)
+
+// 监听事件
+emitter.on('show-pomodoro-info', () => {
+  showPomodoroInfo.value = true
+})
 
 // 获取router实例
 const router = useRouter()
@@ -26,6 +44,9 @@ const isFullscreen = ref(false)
 const settingsStore = useSettingsStore()
 const timerStore = useTimerStore()
 const todoStore = useTodoStore()
+
+// 新增：显示番茄工作法介绍弹窗的状态
+const showPomodoroInfo = ref(false)
 
 // 使用storeToRefs保持响应性
 const { currentMode } = storeToRefs(timerStore)
@@ -217,6 +238,18 @@ onUnmounted(() => {
                         </n-dropdown>
 
                         <n-space>
+                            <!-- 新增：番茄工作法介绍按钮 -->
+                            <n-tooltip trigger="hover" placement="bottom">
+                                <template #trigger>
+                                    <n-button circle @click="showPomodoroInfo = true" class="pomodoro-info-btn">
+                                        <n-icon>
+                                            <Help />
+                                        </n-icon>
+                                    </n-button>
+                                </template>
+                                <span>番茄工作法介绍</span>
+                            </n-tooltip>
+
                             <n-tooltip trigger="hover" placement="bottom">
                                 <template #trigger>
                                     <n-button circle @click="toggleTheme" class="theme-btn">
@@ -330,6 +363,9 @@ onUnmounted(() => {
                 </div>
             </n-drawer-content>
         </n-drawer>
+
+        <!-- 新增：番茄工作法介绍弹窗 -->
+        <pomodoro-info-modal v-model:show="showPomodoroInfo" />
     </n-layout>
     <!-- 迷你音乐控制器 -->
     <mini-music-controller />
@@ -700,5 +736,20 @@ onUnmounted(() => {
 :deep(.settings-card) {
     width: 100%;
     max-width: 100%;
+}
+
+/* 添加番茄工作法按钮的样式 */
+.pomodoro-info-btn {
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    border: none;
+    color: #ff6347;
+}
+
+.pomodoro-info-btn:hover {
+    transform: translateY(-3px) rotate(15deg);
+    box-shadow: 0 4px 8px rgba(255, 99, 71, 0.4);
+    background-color: rgba(255, 99, 71, 0.1);
 }
 </style>

@@ -64,6 +64,13 @@ import { useTimerStore, useTodoStore } from './stores'
 import { nextTick } from 'vue'
 import type { Todo } from './services/DatabaseService'
 import TestDataGenerator from './services/TestDataGenerator'
+import mitt, { Emitter } from 'mitt'
+
+// 定义事件类型
+type Events = {
+  'show-pomodoro-info': void;
+  [key: string]: any;
+}
 
 // 导入全局样式
 import './assets/styles/variables.css'
@@ -132,6 +139,11 @@ const app = createApp(App)
 app.use(router)
 app.use(naive)
 app.use(pinia)
+
+// 创建类型化的全局事件总线
+const emitter: Emitter<Events> = mitt()
+// 将事件总线添加到全局属性
+app.config.globalProperties.emitter = emitter
 
 // 应用程序挂载
 app.mount('#app')

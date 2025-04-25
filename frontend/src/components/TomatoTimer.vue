@@ -1,13 +1,32 @@
 <script setup lang="ts">
-import { onUnmounted, onMounted, watch, nextTick, ref, computed } from 'vue'
+import { onUnmounted, onMounted, watch, nextTick, ref, computed, inject } from 'vue'
 import { NButton, NSpace, NIcon, NProgress, NCard, NTag, NTooltip, NPopover, NSpin, NRadioGroup, NRadioButton } from 'naive-ui'
-import { Play, Pause, Reset, Information, Settings } from '@vicons/carbon'
+import { Play, Pause, Reset, Information, Settings, Help } from '@vicons/carbon'
 import TomatoSvg from './TomatoSvg.vue'
 import { useTimerStore, useSettingsStore, useTodoStore } from '../stores'
 import { storeToRefs } from 'pinia'
 import { soundEffectService } from '../services/soundEffectService'
 import CustomTimerSettings from './CustomTimerSettings.vue'
 import { TimerMode } from '../stores/timerStore'
+import type { Emitter } from 'mitt'
+
+// 定义事件总线类型
+type Events = {
+  'show-pomodoro-info': void;
+  [key: string]: any;
+}
+
+// 注入全局事件并正确类型化
+const emitter = inject('emitter') as Emitter<Events> | undefined
+
+// 添加显示番茄工作法介绍的方法
+const showPomodoroInfo = () => {
+  // 使用事件总线发送事件，通知MainLayout组件打开番茄工作法介绍弹窗
+  if (emitter) {
+    emitter.emit('show-pomodoro-info')
+    soundEffectService.playButtonClickSound() // 播放按钮音效
+  }
+}
 
 // 音频文件路径常量
 const TIMER_END_SOUND = '/sounds/timer-end.wav';
@@ -256,6 +275,17 @@ watch(() => soundSettings.value.currentSound, (newSound) => {
             <div class="status-left">
                 <div class="status-icon"></div>
                 <span class="status-text">{{ currentMode === 'pomodoro' ? '番茄工作法' : '自定义专注' }}</span>
+                <!-- 添加一个问号图标，点击显示番茄工作法介绍 -->
+                <n-tooltip trigger="hover" placement="bottom">
+                    <template #trigger>
+                        <n-button text size="small" class="info-btn" @click="showPomodoroInfo">
+                            <n-icon>
+                                <Help />
+                            </n-icon>
+                        </n-button>
+                    </template>
+                    <span>番茄工作法介绍</span>
+                </n-tooltip>
             </div>
             <n-tag :type="isRunning ? 'success' : 'warning'" size="small" class="status-tag">
                 {{ statusText }}
@@ -739,5 +769,18 @@ watch(() => soundSettings.value.currentSound, (newSound) => {
 
 .timer-info {
     margin-top: 5px;
+}
+
+/* 添加问号图标按钮样式 */
+.info-btn {
+    margin-left: 5px;
+    color: #ff6347;
+    opacity: 0.7;
+    transition: all 0.3s ease;
+}
+
+.info-btn:hover {
+    opacity: 1;
+    transform: rotate(15deg) scale(1.2);
 }
 </style>

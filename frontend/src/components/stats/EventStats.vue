@@ -1,58 +1,49 @@
 <!-- 事件统计组件 -->
 <template>
   <div class="event-stats">
-    <h3 class="section-title">事件统计</h3>
+    <div class="stats-header">
+      <h3 class="section-title">事件统计</h3>
+
+      <!-- 修改刷新按钮样式，使用静态图标 -->
+      <button class="refresh-btn" @click="refreshData" :disabled="loading">
+        <i class="refresh-icon" v-if="!loading">🔄</i>
+        <span v-if="loading" class="loading-spinner-small"></span>
+        <span v-else>刷新</span>
+      </button>
+    </div>
 
     <!-- 加载状态 -->
     <div v-if="loading" class="loading-container">
       <div class="loading-spinner"></div>
       <p>加载统计数据中...</p>
-      <!-- 添加超时按钮，允许用户手动跳过加载 -->
-      <button @click="forceStopLoading" class="force-stop-btn">跳过加载</button>
+      <button @click="forceStopLoading" class="skip-loading-btn">跳过加载</button>
     </div>
 
-    <div v-else-if="stats.totalEvents === 0 && (!stats.trendData || stats.trendData.length === 0)" class="empty-data">
+    <div v-else-if="!hasData" class="empty-data">
       <div class="empty-icon">📋</div>
       <p>暂无事件统计数据</p>
       <p class="empty-tip">完成一些任务后再来查看吧</p>
     </div>
 
     <div v-else>
-      <!-- 时间筛选 -->
+      <!-- 修改时间筛选布局 -->
       <div class="time-filter">
-        <div class="filter-label">时间范围：</div>
-        <div class="filter-buttons">
-          <button
-            v-for="filter in timeFilters"
-            :key="filter.value"
-            :class="['filter-btn', { active: currentFilter === filter.value }]"
-            @click="changeTimeFilter(filter.value)"
-          >
-            {{ filter.label }}
-          </button>
-        </div>
-        <div class="custom-date-range" v-if="currentFilter === 'custom'">
-          <input type="date" v-model="startDate" @change="loadData" />
-          <span>至</span>
-          <input type="date" v-model="endDate" @change="loadData" />
-        </div>
-        <div class="refresh-controls">
-          <button
-            class="refresh-btn"
-            @click="loadData"
-            :disabled="loading"
-            title="立即刷新数据"
-          >
-            <span class="refresh-icon" :class="{ 'spinning': loading }">🔄</span>
-          </button>
-          <button
-            class="auto-refresh-btn"
-            :class="{ active: autoRefresh }"
-            @click="toggleAutoRefresh"
-            title="每分钟自动刷新数据"
-          >
-            {{ autoRefresh ? '停止自动刷新' : '自动刷新' }}
-          </button>
+        <div class="filter-container">
+          <div class="filter-buttons">
+            <button
+              v-for="filter in timeFilters"
+              :key="filter.value"
+              :class="['filter-btn', { active: currentFilter === filter.value }]"
+              @click="changeTimeFilter(filter.value)"
+            >
+              {{ filter.label }}
+            </button>
+          </div>
+          <div class="custom-date-range" v-if="currentFilter === 'custom'">
+            <input type="date" v-model="startDate" @change="loadData" />
+            <span>至</span>
+            <input type="date" v-model="endDate" @change="loadData" />
+          </div>
         </div>
       </div>
 
@@ -123,6 +114,18 @@ import { formatMinutes, formatDateShort } from '../../utils/formatters';
 import { logger } from '../../utils/logger';
 import BaseChart from '../common/BaseChart.vue';
 import { useChartsTheme } from '../../hooks/useChartsTheme';
+
+// 扩展Window接口，添加loadingTimeoutId属性
+declare global {
+  interface Window {
+    loadingTimeoutId: number | null;
+    refreshDataTimeout: ReturnType<typeof setTimeout> | null;
+  }
+}
+
+// 初始化全局变量
+window.loadingTimeoutId = null;
+window.refreshDataTimeout = null;
 
 // 注册必要的组件
 echarts.use([
@@ -204,6 +207,30 @@ const {
   getLineChartOption
 } = useChartsTheme();
 
+// 获取趋势图表选项
+const getTrendChartOption = () => {
+  // 准备数据
+  if (!stats.trendData || !Array.isArray(stats.trendData) || stats.trendData.length === 0) {
+    return {
+      tooltip: {},
+      xAxis: { type: 'category', data: [] },
+      yAxis: { type: 'value' },
+      series: [{ data: [], type: 'line' }]
+    };
+  }
+
+  const dates = stats.trendData.map(item => formatDateShort(item.date || ''));
+  const focusData = stats.trendData.map(item => item.totalFocusMinutes || 0);
+
+  // 使用useChartsTheme返回的工具函数生成图表选项
+  return getLineChartOption({
+    dates,
+    data: focusData,
+    name: '专注时长',
+    yAxisFormatter: (value) => `${Math.floor(value / 60)}h`
+  });
+};
+
 // 检查是否有数据
 const hasData = computed(() => {
   // 添加调试日志
@@ -255,71 +282,67 @@ const loadData = async () => {
     return;
   }
 
-  // 设置加载超时定时器 - 10秒后自动停止加载
-  let loadingTimeout: number | null = window.setTimeout(() => {
-    console.warn('加载数据超时（10秒）');
-    forceStopLoading();
-  }, 10000);
-
   console.log(`开始加载事件统计数据，时间范围: ${startDate.value} - ${endDate.value}`);
   loading.value = true;
+  error.value = null;
+
   // 同步更新全局加载状态
   setGlobalLoading?.(true);
+  setGlobalError?.('');
 
   try {
-    // 直接使用eventStats接口获取数据
-    const response = await Promise.race([
-      dbService.getEventStats(startDate.value, endDate.value),
-      // 5秒后自动返回空数据，避免永久等待
-      new Promise<EventStatsResponse>((resolve) => {
-        setTimeout(() => {
-          console.warn('API请求超时，返回空数据');
-          resolve({
-            totalEvents: 0,
-            completedEvents: 0,
-            completionRate: '0%',
-            trendData: []
-          });
-        }, 5000);
-      })
-    ]);
+    // 设置加载超时处理
+    const timeoutId = setTimeout(() => {
+      if (loading.value) {
+        console.warn('数据加载超时，自动停止加载');
+        completeLoading();
+      }
+    }, 15000); // 15秒超时
 
-    // 清除超时定时器
-    if (loadingTimeout) {
-      clearTimeout(loadingTimeout);
-      loadingTimeout = null;
+    // 直接获取数据
+    console.time('获取事件统计数据');
+    const response = await dbService.getEventStats(startDate.value, endDate.value);
+    console.timeEnd('获取事件统计数据');
+    console.log('获取到的事件统计数据:', response);
+
+    // 清除超时计时器
+    clearTimeout(timeoutId);
+
+    // 检查数据是否有效
+    if (!response) {
+      console.warn('API返回无效数据');
+      throw new Error('获取事件统计数据失败');
     }
 
-    // 记录到控制台，便于调试
-    console.log('收到事件统计数据:', JSON.stringify(response));
-
-    // 更新数据，确保所有字段都有有效值
-    const processedData = {
+    // 数据预处理 - 确保数据结构和值的有效性
+    const processedData: EventStatsResponse = {
       totalEvents: typeof response.totalEvents === 'number' ? response.totalEvents : 0,
       completedEvents: typeof response.completedEvents === 'number' ? response.completedEvents : 0,
-      completionRate: typeof response.completionRate === 'string' ? response.completionRate : '0%',
+      completionRate: typeof response.completionRate === 'string' ? response.completionRate : '0.00',
       trendData: Array.isArray(response.trendData) ? [...response.trendData] : []
     };
 
-    // 如果数据是空的，显示样例数据以便于调试
-    if (processedData.totalEvents === 0 && (!processedData.trendData || processedData.trendData.length === 0)) {
-      console.log('接收到空数据，停止加载');
-      Object.assign(stats, processedData);
-      completeLoading();
-      return;
+    // 确保完成率格式正确（百分比字符串）
+    if (!processedData.completionRate.endsWith('%')) {
+      const rate = parseFloat(processedData.completionRate);
+      processedData.completionRate = isNaN(rate) ? '0.00' : rate.toFixed(2) + '%';
     }
 
-    // 如果完成率不是百分数格式，添加百分号
-    if (processedData.completionRate && !processedData.completionRate.includes('%')) {
-      processedData.completionRate = `${processedData.completionRate}%`;
-    }
-
-    // 确保趋势数据中的每项都有日期和专注时间
-    if (processedData.trendData.length > 0) {
+    // 处理趋势数据
+    if (processedData.trendData && processedData.trendData.length > 0) {
       processedData.trendData = processedData.trendData.map(item => ({
         date: item.date || new Date().toISOString().split('T')[0],
         totalFocusMinutes: typeof item.totalFocusMinutes === 'number' ? item.totalFocusMinutes : 0
       })).filter(item => !!item.date); // 过滤掉没有日期的项
+
+      // 确保趋势数据是按日期排序的
+      processedData.trendData.sort((a, b) => {
+        const dateA = new Date(a.date || '1970-01-01');
+        const dateB = new Date(b.date || '1970-01-01');
+        return dateA.getTime() - dateB.getTime();
+      });
+    } else {
+      processedData.trendData = [];
     }
 
     console.log('处理后的数据:', JSON.stringify(processedData));
@@ -327,51 +350,41 @@ const loadData = async () => {
     // 更新响应式数据对象
     Object.assign(stats, processedData);
 
-    console.log('数据更新后状态:', {
-      totalEvents: stats.totalEvents,
-      completedEvents: stats.completedEvents,
-      completionRate: stats.completionRate,
-      trendDataLength: stats.trendData?.length || 0
-    });
-
-    // 确保趋势数据是按日期排序的
-    if (stats.trendData && stats.trendData.length > 0) {
-      stats.trendData.sort((a, b) => {
-        const dateA = new Date(a.date || '1970-01-01');
-        const dateB = new Date(b.date || '1970-01-01');
-        return dateA.getTime() - dateB.getTime();
-      });
-    }
+    // 同时更新顶层访问变量
+    totalEvents.value = stats.totalEvents;
+    completedEvents.value = stats.completedEvents;
+    completionRate.value = stats.completionRate;
 
     // 更新最后刷新时间
     updateLastRefreshTime?.();
 
-    // 重置错误状态
-    setGlobalError?.('');
-
-    // 使用通用的完成加载方法
-    completeLoading();
+    // 数据加载成功后绘制图表 - 使用requestAnimationFrame提高渲染性能
+    window.requestAnimationFrame(() => {
+      chartVisible.value = true;
+      if (hasData.value) {
+        refreshCharts();
+      }
+    });
   } catch (error) {
-    // 清除超时定时器
-    if (loadingTimeout) {
-      clearTimeout(loadingTimeout);
-      loadingTimeout = null;
-    }
-
     console.error('加载事件统计数据失败:', error);
+
     // 设置错误状态
     setGlobalError?.('加载事件统计数据失败，请稍后重试');
 
-    // 重置数据，确保显示暂无数据
-    Object.assign(stats, {
-      totalEvents: 0,
-      completedEvents: 0,
-      completionRate: '0%',
-      trendData: []
-    });
-
-    // 确保加载状态结束
-    completeLoading();
+    // 如果数据为空，不使用示例数据，保持空状态
+    if (!stats.totalEvents && (!stats.trendData || stats.trendData.length === 0)) {
+      // 清空数据对象
+      Object.assign(stats, {
+        totalEvents: 0,
+        completedEvents: 0,
+        completionRate: '0%',
+        trendData: []
+      });
+    }
+  } finally {
+    // 结束加载状态
+    loading.value = false;
+    setGlobalLoading?.(false);
   }
 };
 
@@ -407,29 +420,25 @@ const completeLoading = () => {
 const forceStopLoading = () => {
   console.log('强制停止加载');
 
-  // 生成样例数据以确保UI正常显示
-  const today = new Date();
-  const sampleData = {
-    totalEvents: 5,
-    completedEvents: 3,
-    completionRate: '60%',
-    trendData: Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(today);
-      date.setDate(date.getDate() - (6 - i));
-      return {
-        date: date.toISOString().split('T')[0],
-        totalFocusMinutes: Math.floor(Math.random() * 120) + 30 // 30-150分钟
-      };
-    })
-  };
+  if (window.loadingTimeoutId) {
+    clearTimeout(window.loadingTimeoutId);
+    window.loadingTimeoutId = null;
+  }
 
-  Object.assign(stats, sampleData);
+  // 清空数据
+  Object.assign(stats, {
+    totalEvents: 0,
+    completedEvents: 0,
+    completionRate: '0%',
+    trendData: []
+  });
 
-  // 使用通用方法完成加载
-  completeLoading();
+  // 结束加载状态
+  loading.value = false;
+  setGlobalLoading?.(false);
 
   // 显示提示
-  setGlobalError?.('数据加载超时，显示示例数据');
+  setGlobalError?.('加载已中止，请重试或稍后再试');
 };
 
 // 使用自动刷新Hook
@@ -479,15 +488,54 @@ const handleResize = () => {
 
 window.addEventListener('resize', handleResize);
 
-// 组件卸载时移除事件监听
+// 定义可见性变化事件处理函数
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    console.log('页面变为可见，刷新数据');
+    refreshData();
+  }
+};
+
+// 定义数据更新事件处理函数
+const handleStatsUpdated = () => {
+  console.log('检测到统计数据更新事件，刷新数据');
+  // 使用防抖函数，避免短时间内多次刷新
+  if (window.refreshDataTimeout) {
+    clearTimeout(window.refreshDataTimeout);
+  }
+  window.refreshDataTimeout = setTimeout(() => {
+    refreshData();
+  }, 500);
+};
+
+// 组件挂载时加载数据并添加事件监听
+onMounted(() => {
+  // 初始加载数据
+  loadData();
+
+  // 监听统计数据更新事件
+  window.addEventListener('stats-updated', handleStatsUpdated);
+
+  // 添加可见性变化监听，当页面可见时刷新数据
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+});
+
+// 组件卸载时清理事件监听
 onBeforeUnmount(() => {
   window.removeEventListener('resize', handleResize);
   document.documentElement.removeEventListener('data-theme-changed', updateChartsTheme);
+  window.removeEventListener('stats-updated', handleStatsUpdated);
+  document.removeEventListener('visibilitychange', handleVisibilityChange);
 
   // 清除自动刷新定时器
   if (refreshTimer) {
     clearInterval(refreshTimer);
     refreshTimer = null;
+  }
+
+  if (window.refreshDataTimeout) {
+    clearTimeout(window.refreshDataTimeout);
+    window.refreshDataTimeout = null;
   }
 
   // 销毁图表实例
@@ -705,21 +753,6 @@ const initWorkloadTrendChart = () => {
     console.log('开始初始化工作量趋势图');
     workloadTrendChartInstance = echarts.init(workloadTrendChart.value);
 
-    // 获取趋势图表选项
-    const getTrendChartOption = () => {
-      // 准备数据
-      const dates = stats.trendData.map(item => formatDateShort(item.date || ''));
-      const focusData = stats.trendData.map(item => item.totalFocusMinutes || 0);
-
-      // 使用useChartsTheme返回的工具函数生成图表选项
-      return getLineChartOption({
-        dates,
-        data: focusData,
-        name: '专注时长',
-        yAxisFormatter: (value) => `${Math.floor(value / 60)}h`
-      });
-    };
-
     // 设置选项并渲染
     workloadTrendChartInstance.setOption(getTrendChartOption());
     console.log('工作量趋势图初始化完成');
@@ -727,11 +760,6 @@ const initWorkloadTrendChart = () => {
     console.error('初始化工作量趋势图时出错:', e);
   }
 };
-
-// 组件挂载时加载数据 - 不再需要，由useAutoRefresh处理
-onMounted(() => {
-  loadData();
-});
 </script>
 
 <style scoped>
@@ -747,24 +775,41 @@ onMounted(() => {
 }
 
 .time-filter {
+  margin: 15px 0;
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  gap: 10px;
-  justify-content: space-between;
 }
 
-.filter-label {
-  margin-right: 10px;
-  font-size: 14px;
-  color: #606266;
+.filter-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
 .filter-buttons {
   display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filter-btn {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  background-color: #f5f5f5;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  background-color: #e8e8e8;
+}
+
+.filter-btn.active {
+  background-color: #1867c0;
+  color: white;
+  border-color: #1867c0;
 }
 
 .refresh-controls {
@@ -774,34 +819,34 @@ onMounted(() => {
 }
 
 .refresh-btn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: white;
-  border: 1px solid #DCDFE6;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid #e0e0e0;
+  background-color: #ffffff;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
 }
 
 .refresh-btn:hover {
-  background-color: #f5f7fa;
+  background-color: #f0f0f0;
 }
 
 .refresh-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .refresh-icon {
-  font-size: 16px;
-  display: inline-block;
+  font-size: 14px;
+  /* 移除旋转动画 */
 }
 
-.refresh-icon.spinning {
-  animation: spin 1s linear infinite;
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .auto-refresh-btn {
@@ -963,11 +1008,6 @@ onMounted(() => {
   margin-top: 8px;
 }
 
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
 @media (max-width: 768px) {
   .charts-container {
     grid-template-columns: 1fr;
@@ -1029,26 +1069,6 @@ onMounted(() => {
   background-color: #33415a;
 }
 
-.filter-btn {
-  padding: 6px 12px;
-  border: 1px solid #DCDFE6;
-  border-radius: 4px;
-  background-color: white;
-  color: #606266;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.filter-btn:hover {
-  border-color: #C0C4CC;
-}
-
-.filter-btn.active {
-  background-color: #3A82F6;
-  color: white;
-  border-color: #3A82F6;
-}
-
 .force-stop-btn {
   margin-top: 16px;
   padding: 8px 16px;
@@ -1071,5 +1091,42 @@ onMounted(() => {
 
 :root[data-theme="dark"] .force-stop-btn:hover {
   background-color: #c0392b;
+}
+
+.skip-loading-btn {
+  margin-top: 16px;
+  padding: 6px 12px;
+  border: 1px solid #DCDFE6;
+  border-radius: 4px;
+  background-color: white;
+  color: #606266;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.skip-loading-btn:hover {
+  background-color: #f5f7fa;
+  border-color: #C0C4CC;
+}
+
+:root[data-theme="dark"] .skip-loading-btn {
+  background-color: #252D3C;
+  border-color: #4C5D7A;
+  color: #E5EAF3;
+}
+
+.loading-spinner-small {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top-color: #333;
+  animation: spin 1s linear infinite;
+}
+
+:root[data-theme="dark"] .loading-spinner-small {
+  border-color: rgba(255, 255, 255, 0.1);
+  border-top-color: #E5EAF3;
 }
 </style>

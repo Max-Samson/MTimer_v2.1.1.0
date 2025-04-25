@@ -353,6 +353,13 @@ const isAPIKeyValid = computed(() => {
   min-height: calc(100vh - 20px);
   display: flex;
   flex-direction: column;
+  background-color: rgba(255, 255, 255, 0.5);
+  transition: background-color var(--transition-time) ease;
+}
+
+:root[data-theme="dark"] .settings-view {
+  background-color: rgba(18, 24, 36, 0.7);
+  backdrop-filter: blur(10px);
 }
 
 .settings-card {
@@ -361,6 +368,13 @@ const isAPIKeyValid = computed(() => {
   flex: 1;
   box-shadow: none;
   border-radius: 0;
+  transition: all var(--transition-time) ease;
+}
+
+:root[data-theme="dark"] .settings-card {
+  background-color: rgba(30, 38, 52, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
 }
 
 /* 内容区域样式 */
@@ -574,6 +588,141 @@ const isAPIKeyValid = computed(() => {
 
   .api-key-actions :deep(.n-button) {
     width: 100%;
+  }
+}
+
+/* AI助手设置区域样式 */
+.ai-settings-header {
+  transition: all var(--transition-time) ease;
+}
+
+:root[data-theme="dark"] .ai-settings-header {
+  background-color: rgba(35, 42, 55, 0.7);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme="dark"] .ai-settings-icon {
+  background-color: rgba(79, 70, 229, 0.2);
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.3);
+}
+
+:root[data-theme="dark"] .section-header {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+/* API密钥设置区域样式 */
+.api-key-section, .model-settings-section {
+  transition: all var(--transition-time) ease;
+  border-radius: 12px;
+  padding: 20px;
+}
+
+:root[data-theme="dark"] .api-key-section,
+:root[data-theme="dark"] .model-settings-section {
+  background-color: rgba(35, 42, 55, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 输入框样式优化 */
+:root[data-theme="dark"] .api-key-input :deep(.n-input) {
+  background-color: rgba(45, 55, 72, 0.7);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-theme="dark"] .api-key-input :deep(.n-input:hover),
+:root[data-theme="dark"] .api-key-input :deep(.n-input:focus) {
+  border-color: rgba(79, 70, 229, 0.5);
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.2);
+}
+
+/* 按钮样式优化 */
+:root[data-theme="dark"] .api-key-actions :deep(.n-button) {
+  background-color: rgba(79, 70, 229, 0.2);
+  border-color: rgba(79, 70, 229, 0.3);
+  color: #fff;
+}
+
+:root[data-theme="dark"] .api-key-actions :deep(.n-button:hover) {
+  background-color: rgba(79, 70, 229, 0.3);
+  border-color: rgba(79, 70, 229, 0.4);
+  box-shadow: 0 0 15px rgba(79, 70, 229, 0.3);
+  transform: translateY(-1px);
+}
+
+/* 测试结果样式优化 */
+:root[data-theme="dark"] .key-test-result {
+  background-color: rgba(35, 42, 55, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .key-test-result.success {
+  background-color: rgba(34, 197, 94, 0.2);
+  border-color: rgba(34, 197, 94, 0.3);
+  color: #4ade80;
+}
+
+:root[data-theme="dark"] .key-test-result.error {
+  background-color: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+/* 标签页样式优化 */
+:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-nav) {
+  background-color: rgba(30, 38, 52, 0.8);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-tab) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-tab:hover) {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-tab--active) {
+  color: #fff;
+}
+
+:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-nav__bar) {
+  background-color: rgb(var(--color-primary));
+  box-shadow: 0 0 10px rgba(var(--color-primary), 0.3);
+}
+
+/* 动画效果 */
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px rgba(79, 70, 229, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(79, 70, 229, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(79, 70, 229, 0.2);
+  }
+}
+
+:root[data-theme="dark"] .ai-settings-icon {
+  animation: glow 3s infinite;
+}
+
+/* 响应式布局优化 */
+@media (max-width: 768px) {
+  .settings-content {
+    padding: 16px;
+  }
+
+  .api-key-section,
+  .model-settings-section {
+    padding: 15px;
+  }
+
+  :root[data-theme="dark"] .ai-settings-header {
+    padding: 15px;
   }
 }
 </style>

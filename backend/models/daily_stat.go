@@ -8,17 +8,17 @@ import (
 
 // DailyStat 代表每日统计数据
 type DailyStat struct {
-	ID                 int64  `json:"stat_id"`
-	Date               string `json:"date"`                 // 格式: YYYY-MM-DD
-	PomodoroCount      int    `json:"pomodoro_count"`       // 番茄模式的事件次数
-	CustomCount        int    `json:"custom_count"`         // 自定义模式的事件次数
-	TotalFocusSessions int    `json:"total_focus_sessions"` // 专注事件总数
-	PomodoroMinutes    int    `json:"pomodoro_minutes"`     // 番茄专注总分钟数
+	ID                 int64  `json:"stat_id"`              // 统计记录的唯一标识ID
+	Date               string `json:"date"`                 // 日期，格式: YYYY-MM-DD
+	PomodoroCount      int    `json:"pomodoro_count"`       // 番茄工作法模式的完成次数
+	CustomCount        int    `json:"custom_count"`         // 自定义专注模式的完成次数
+	TotalFocusSessions int    `json:"total_focus_sessions"` // 当日专注会话总数（番茄+自定义）
+	PomodoroMinutes    int    `json:"pomodoro_minutes"`     // 番茄工作法专注总分钟数
 	CustomMinutes      int    `json:"custom_minutes"`       // 自定义专注总分钟数
-	TotalFocusMinutes  int    `json:"total_focus_minutes"`  // 专注总时长（分钟）
-	TotalBreakMinutes  int    `json:"total_break_minutes"`  // 休息总时长（分钟）
-	TomatoHarvests     int    `json:"tomato_harvests"`      // 番茄收成数
-	TimeRanges         string `json:"time_ranges"`          // JSON格式的时间段数组
+	TotalFocusMinutes  int    `json:"total_focus_minutes"`  // 当日专注总时长（分钟）
+	TotalBreakMinutes  int    `json:"total_break_minutes"`  // 当日休息总时长（分钟）
+	TomatoHarvests     int    `json:"tomato_harvests"`      // 番茄收获数（完成的番茄钟次数）
+	TimeRanges         string `json:"time_ranges"`          // 当日专注时段分布，JSON格式字符串数组，例如：["09:00~09:25", "11:00~11:25"]
 }
 
 // DailyStatRepository 提供对DailyStat表的操作

@@ -6,13 +6,13 @@ import (
 
 // EventStat 表示任务历史统计数据
 type EventStat struct {
-	StatID         int64  `json:"stat_id"`          // 事件统计记录的唯一标识
-	EventID        int64  `json:"event_id"`         // 对应todos表的todo_id
-	Date           string `json:"date"`             // 格式：YYYY-MM-DD
-	FocusCount     int    `json:"focus_count"`      // 该任务在这天的专注次数
-	TotalFocusTime int    `json:"total_focus_time"` // 累计专注时长（分钟）
-	Mode           int    `json:"mode"`             // 任务模式
-	Completed      bool   `json:"completed"`        // 是否完成
+	StatID         int64  `json:"stat_id"`          // 事件统计记录的唯一标识ID
+	EventID        int64  `json:"event_id"`         // 对应的待办事项ID（todos表中的todo_id）
+	Date           string `json:"date"`             // 统计日期，格式：YYYY-MM-DD
+	FocusCount     int    `json:"focus_count"`      // 该待办事项在当天的专注次数
+	TotalFocusTime int    `json:"total_focus_time"` // 该待办事项在当天的累计专注时长（分钟）
+	Mode           int    `json:"mode"`             // 专注模式: 0=番茄工作法, 1=自定义专注模式
+	Completed      bool   `json:"completed"`        // 该待办事项在当天是否已完成
 }
 
 // EventStatRepository 提供对EventStat表的操作

@@ -9,15 +9,15 @@ import (
 
 // Todo 表示待办事项
 type Todo struct {
-	ID                 int64      `json:"id"`
-	Name               string     `json:"name"`
-	Mode               int        `json:"mode"` // 1: pomodoro, 2: custom
-	Status             string     `json:"status"`
-	CreatedAt          time.Time  `json:"created_at"`
-	UpdatedAt          time.Time  `json:"updated_at"`
-	EstimatedPomodoros int        `json:"estimated_pomodoros"`
-	CustomSettings     string     `json:"custom_settings"` // JSON字符串，存储自定义设置
-	CompletedAt        *time.Time `json:"completed_at"`    // 任务完成时间，未完成时为nil
+	ID                 int64      `json:"id"`                  // 待办事项的唯一标识ID
+	Name               string     `json:"name"`                // 待办事项名称
+	Mode               int        `json:"mode"`                // 专注模式: 0=番茄工作法, 1=自定义专注模式
+	Status             string     `json:"status"`              // 状态: pending=待处理, inProgress=进行中, completed=已完成
+	CreatedAt          time.Time  `json:"created_at"`          // 创建时间
+	UpdatedAt          time.Time  `json:"updated_at"`          // 最后更新时间
+	EstimatedPomodoros int        `json:"estimated_pomodoros"` // 预计需要的番茄钟数量
+	CustomSettings     string     `json:"custom_settings"`     // 自定义设置，JSON格式字符串
+	CompletedAt        *time.Time `json:"completed_at"`        // 任务完成时间，未完成时为nil
 }
 
 // TodoRepository 提供对Todo表的操作

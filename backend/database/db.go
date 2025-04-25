@@ -257,15 +257,15 @@ func initTestData() error {
 		estimatedPomodoros int
 		completedAt        string // 为空表示未完成
 	}{
-		{"完成项目报告", 0, "completed", 5, "2025-04-01 18:30:00"},
-		{"学习Vue.js基础", 0, "completed", 3, "2025-04-02 16:45:00"},
-		{"阅读技术文档", 1, "completed", 2, "2025-04-03 10:15:00"},
+		{"完成开发文档报告", 0, "completed", 5, ""},
+		{"学习Vue.js基础", 0, "completed", 3, "2025-04-22 16:45:00"},
+		{"阅读技术文档", 1, "completed", 2, "2025-04-21 10:15:00"},
 		{"准备演讲材料", 0, "pending", 4, ""},
 		{"重构代码模块", 1, "pending", 6, ""},
-		{"修复UI界面bug", 0, "completed", 2, "2025-04-04 14:20:00"},
+		{"修复UI界面bug", 0, "completed", 2, "2025-04-23 14:20:00"},
 		{"学习TypeScript", 1, "pending", 8, ""},
-		{"编写单元测试", 0, "completed", 3, "2025-04-05 11:00:00"},
-		{"开发新功能", 1, "completed", 7, "2025-04-06 17:30:00"},
+		{"编写单元测试", 0, "completed", 3, "2025-04-24 11:00:00"},
+		{"开发新功能", 1, "completed", 7, "2025-04-24 17:30:00"},
 		{"Code Review", 0, "pending", 2, ""},
 	}
 
@@ -327,15 +327,23 @@ func initTestData() error {
 				dayOffset := -i % 7 // 分散在过去7天
 				hour := 9 + (i % 8) // 9点到16点之间
 
+				// 生成丰富的专注时长，范围在20-30分钟之间
+				focusDuration := 25
+				if i%3 == 0 {
+					focusDuration = 30
+				} else if i%3 == 1 {
+					focusDuration = 20
+				}
+
 				stmt, err = tx.Prepare(`
 					INSERT INTO focus_sessions (todo_id, start_time, end_time, break_time, duration, mode)
-					VALUES (?, datetime('now', ? || ' days', ? || ' hours'), datetime('now', ? || ' days', ? || ' hours', '+25 minutes'), 5, 25, ?)
+					VALUES (?, datetime('now', ? || ' days', ? || ' hours'), datetime('now', ? || ' days', ? || ' hours', '+' || ? || ' minutes'), 5, ?, ?)
 				`)
 				if err != nil {
 					return fmt.Errorf("准备插入专注会话SQL失败: %w", err)
 				}
 
-				_, err = stmt.Exec(todoId, dayOffset, hour, dayOffset, hour, todo.mode)
+				_, err = stmt.Exec(todoId, dayOffset, hour, dayOffset, hour, focusDuration, focusDuration, todo.mode)
 				stmt.Close()
 				if err != nil {
 					return fmt.Errorf("插入专注会话失败: %w", err)
@@ -349,15 +357,23 @@ func initTestData() error {
 				dayOffset := -i % 7 // 分散在过去7天
 				hour := 9 + (i % 8) // 9点到16点之间
 
+				// 生成丰富的专注时长，范围在20-30分钟之间
+				focusDuration := 25
+				if i%3 == 0 {
+					focusDuration = 28
+				} else if i%3 == 1 {
+					focusDuration = 22
+				}
+
 				stmt, err = tx.Prepare(`
 					INSERT INTO focus_sessions (todo_id, start_time, end_time, break_time, duration, mode)
-					VALUES (?, datetime('now', ? || ' days', ? || ' hours'), datetime('now', ? || ' days', ? || ' hours', '+25 minutes'), 5, 25, ?)
+					VALUES (?, datetime('now', ? || ' days', ? || ' hours'), datetime('now', ? || ' days', ? || ' hours', '+' || ? || ' minutes'), 5, ?, ?)
 				`)
 				if err != nil {
 					return fmt.Errorf("准备插入未完成待办事项的专注会话SQL失败: %w", err)
 				}
 
-				_, err = stmt.Exec(todoId, dayOffset, hour, dayOffset, hour, todo.mode)
+				_, err = stmt.Exec(todoId, dayOffset, hour, dayOffset, hour, focusDuration, focusDuration, todo.mode)
 				stmt.Close()
 				if err != nil {
 					return fmt.Errorf("插入未完成待办事项的专注会话失败: %w", err)
@@ -376,7 +392,11 @@ func initTestData() error {
 		customMinutes := customCount * 30
 		totalFocusMinutes := pomodoroMinutes + customMinutes
 		breakMinutes := totalSessions * 5
-		tomatoHarvests := pomodoroCount - 1 // 不是每个都收获
+		// 确保番茄收成数据足够丰富，且至少大于0
+		tomatoHarvests := pomodoroCount - (i % 2) // 大部分番茄钟都有收成
+		if tomatoHarvests <= 0 {
+			tomatoHarvests = 3 // 至少有3个收成
+		}
 
 		// 生成时间范围JSON字符串
 		timeRanges := make([]string, 0)
@@ -427,33 +447,35 @@ func initTestData() error {
 	// 4. 生成事件统计数据
 	for todoId := 1; todoId <= len(testTodos); todoId++ {
 		// 为每个待办事项在过去几天中生成统计数据
-		for i := 0; i < 5; i++ {
-			if i%2 == 0 || todoId%3 == 0 { // 不是每个待办事项每天都有数据
-				mode := 0
-				if todoId%2 == 0 {
-					mode = 1 // 偶数ID使用自定义模式
-				}
+		for i := 0; i < 7; i++ { // 增加到7天确保有足够的日期数据
+			// 确保每个待办事项都有每天的数据
+			mode := 0
+			if todoId%2 == 0 {
+				mode = 1 // 偶数ID使用自定义模式
+			}
 
-				focusCount := 1 + (todoId % 3) // 1-3次专注
-				focusTime := focusCount * 25   // 每次25分钟
-				completed := 0
-				if i == 0 && todoId <= 6 { // 部分待办事项标记为已完成
-					completed = 1
-				}
+			// 生成随机的专注次数和时间数据
+			focusCount := 1 + (todoId+i)%5                 // 1-5次专注
+			focusTime := focusCount * (20 + (todoId % 10)) // 每次20-30分钟不等
 
-				stmt, err := tx.Prepare(`
-					INSERT INTO event_stats (event_id, date, focus_count, total_focus_time, mode, completed)
-					VALUES (?, date('now', ? || ' days'), ?, ?, ?, ?)
-				`)
-				if err != nil {
-					return fmt.Errorf("准备插入事件统计SQL失败: %w", err)
-				}
+			// 随机决定是否完成
+			completed := 0
+			if i < 3 || (todoId+i)%4 == 0 { // 增加更多已完成的数据
+				completed = 1
+			}
 
-				_, err = stmt.Exec(todoId, -i, focusCount, focusTime, mode, completed)
-				stmt.Close()
-				if err != nil {
-					return fmt.Errorf("插入事件统计失败: %w", err)
-				}
+			stmt, err := tx.Prepare(`
+				INSERT INTO event_stats (event_id, date, focus_count, total_focus_time, mode, completed)
+				VALUES (?, date('now', ? || ' days'), ?, ?, ?, ?)
+			`)
+			if err != nil {
+				return fmt.Errorf("准备插入事件统计SQL失败: %w", err)
+			}
+
+			_, err = stmt.Exec(todoId, -i, focusCount, focusTime, mode, completed)
+			stmt.Close()
+			if err != nil {
+				return fmt.Errorf("插入事件统计失败: %w", err)
 			}
 		}
 	}
