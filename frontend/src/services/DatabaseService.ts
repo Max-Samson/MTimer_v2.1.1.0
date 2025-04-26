@@ -506,84 +506,63 @@ class DatabaseService {
         };
       }
 
-      // 尝试强制更新后端统计数据
+      // 尝试强制更新后端统计数据，但设置超时
       try {
         console.log("尝试更新后端统计数据...");
-        const appAny = App as any;
-        await appAny.UpdateStats('');
+        const updatePromise = (App as any).UpdateStats('');
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('更新统计数据超时')), 3000)
+        );
+
+        await Promise.race([updatePromise, timeoutPromise]);
         console.log("后端统计数据已更新");
       } catch (updateError) {
-        console.warn("更新后端统计数据失败:", updateError);
+        console.warn("更新后端统计数据失败或超时:", updateError);
+        // 继续执行，尝试获取现有数据
       }
 
-      // 获取真实数据
+      // 获取真实数据，设置超时
       console.log("从数据库获取事件统计数据...");
-      // 兼容性处理：如果没有直接的GetEventStats API，则使用GetStats API代替
       let response: any;
 
       try {
-        // 通过类型断言解决TypeScript类型检查问题
-        const appAny = App as any;
-        console.log("调用GetEventStats API...");
-        const request = {
+        // 设置API调用超时
+        const apiPromise = (App as any).GetEventStats({
           start_date: startDate,
           end_date: endDate
-        };
-        console.log("请求参数:", request);
-        response = await appAny.GetEventStats(request);
+        });
+
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('获取事件统计数据超时')), 3000)
+        );
+
+        // 使用Promise.race确保API调用不会永久挂起
+        response = await Promise.race([apiPromise, timeoutPromise]);
         console.log("GetEventStats API返回结果:", response);
       } catch (err) {
         console.warn("GetEventStats API调用失败:", err);
-        console.log("尝试调用GetStats API作为替代...");
 
-        try {
-          const statsData = await App.GetStats({
-            start_date: startDate,
-            end_date: endDate
-          });
-          console.log("GetStats API返回结果:", statsData);
-
-          if (!statsData || !Array.isArray(statsData)) {
-            console.warn("GetStats API返回无效数据");
-            throw new Error("无法获取统计数据");
-          }
-
-          // 构造兼容的响应对象
-          response = {
-            total_events: 0,
-            completed_events: 0,
-            completion_rate: "0%",
-            trend_data: statsData.map((stat: any) => ({
-              date: stat.date,
-              total_focus_minutes: stat.total_focus_minutes || 0
-            }))
-          };
-        } catch (statsErr) {
-          console.error("GetStats API调用也失败:", statsErr);
-
-          // 如果有缓存数据，返回缓存数据而不是空数据
-          if (cachedData) {
-            console.log("所有API调用失败，但返回过期缓存数据");
-            return cachedData.data;
-          }
-
-          throw new Error("所有API调用失败");
+        // 如果有缓存数据，在API调用失败时返回缓存
+        if (cachedData) {
+          console.log("API调用失败，返回缓存数据");
+          return cachedData.data;
         }
-      }
 
-      console.log('从后端获取的事件统计数据:', JSON.stringify(response));
+        // 无缓存时返回空数据
+        return {
+          totalEvents: 0,
+          completedEvents: 0,
+          completionRate: '0%',
+          trendData: []
+        };
+      }
 
       // 确保响应数据有效
       if (!response) {
         console.warn('后端返回的事件统计数据为空');
 
-        // 如果存在过期缓存，优先使用过期缓存而不是空数据
-        if (cachedData) {
-          console.log("后端返回空数据，使用过期缓存");
-          return cachedData.data;
-        }
-
-        return {
+        // 返回空数据或缓存数据
+        return cachedData ? cachedData.data : {
           totalEvents: 0,
           completedEvents: 0,
           completionRate: '0%',
@@ -604,7 +583,7 @@ class DatabaseService {
           : []
       };
 
-      // 检查完成率格式
+      // 检查完成率格式 - 确保以百分号结尾
       if (result.completionRate && !result.completionRate.endsWith('%')) {
         result.completionRate = `${result.completionRate}%`;
       }
@@ -623,8 +602,7 @@ class DatabaseService {
         return cachedData.data;
       }
 
-      console.log("由于错误且无缓存，返回空数据结构");
-      // 出错时返回空数据结构，确保UI可以正确显示"暂无数据"
+      // 返回空数据结构
       return {
         totalEvents: 0,
         completedEvents: 0,

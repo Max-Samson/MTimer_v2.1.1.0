@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 )
 
@@ -252,42 +253,74 @@ func (r *EventStatRepository) GetEventStatsForTodo(todoID int64, startDate, endD
 
 // GetCompletionStats 获取指定日期范围内的完成率统计
 func (r *EventStatRepository) GetCompletionStats(startDate, endDate string) (map[string]interface{}, error) {
-	// 查询实际的待办事项总数（所有存在的待办事项）
-	var totalTodos int
-	err := DB.QueryRow(`SELECT COUNT(*) FROM todos`).Scan(&totalTodos)
-	if err != nil {
-		return nil, fmt.Errorf("获取待办事项总数失败: %w", err)
-	}
-
-	// 从event_stats表中查询已完成的待办事项数量
+	// 获取所有活跃的待办事项（在指定日期范围内有统计记录的事项）
+	var activeEventIds []int64
 	rows, err := DB.Query(`
-		SELECT COUNT(DISTINCT event_id) as completed_events
+		SELECT DISTINCT event_id
 		FROM event_stats
-		WHERE completed = 1 AND date BETWEEN ? AND ?
+		WHERE date BETWEEN ? AND ?
 	`, startDate, endDate)
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("获取活跃事项ID失败: %w", err)
 	}
 	defer rows.Close()
 
-	var completedEvents int
-	if rows.Next() {
-		err := rows.Scan(&completedEvents)
-		if err != nil {
+	for rows.Next() {
+		var eventId int64
+		if err := rows.Scan(&eventId); err != nil {
 			return nil, err
+		}
+		activeEventIds = append(activeEventIds, eventId)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	// 获取活跃事项的总数量
+	totalEvents := len(activeEventIds)
+	if totalEvents == 0 {
+		return map[string]interface{}{
+			"total_events":     0,
+			"completed_events": 0,
+			"completion_rate":  "0.00%",
+		}, nil
+	}
+
+	// 计算已完成的事项数量（查询todos表获取真实状态）
+	completedEvents := 0
+
+	for _, eventId := range activeEventIds {
+		var status string
+		err := DB.QueryRow(`
+			SELECT status
+			FROM todos
+			WHERE todo_id = ?
+		`, eventId).Scan(&status)
+
+		if err != nil {
+			if err == sql.ErrNoRows {
+				// 如果待办事项不存在，则跳过
+				continue
+			}
+			return nil, fmt.Errorf("查询待办事项状态失败: %w", err)
+		}
+
+		if status == "completed" {
+			completedEvents++
 		}
 	}
 
 	// 计算完成率
 	completionRate := 0.0
-	if totalTodos > 0 {
-		completionRate = float64(completedEvents) / float64(totalTodos) * 100
+	if totalEvents > 0 {
+		completionRate = float64(completedEvents) / float64(totalEvents) * 100
 	}
 
 	return map[string]interface{}{
-		"total_events":     totalTodos,
+		"total_events":     totalEvents,
 		"completed_events": completedEvents,
-		"completion_rate":  fmt.Sprintf("%.2f", completionRate),
+		"completion_rate":  fmt.Sprintf("%.2f%%", completionRate),
 	}, nil
 }

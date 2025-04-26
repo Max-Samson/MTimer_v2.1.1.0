@@ -291,17 +291,23 @@ const loadData = async () => {
   setGlobalError?.('');
 
   try {
-    // 设置加载超时处理
+    // 设置加载超时处理，5秒后强制结束加载状态
     const timeoutId = setTimeout(() => {
       if (loading.value) {
         console.warn('数据加载超时，自动停止加载');
         completeLoading();
       }
-    }, 15000); // 15秒超时
+    }, 5000); // 将超时时间从15秒减少到5秒
 
     // 直接获取数据
     console.time('获取事件统计数据');
-    const response = await dbService.getEventStats(startDate.value, endDate.value);
+    const response = await Promise.race([
+      dbService.getEventStats(startDate.value, endDate.value),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('请求超时')), 4000)
+      )
+    ]) as EventStatsResponse;
+
     console.timeEnd('获取事件统计数据');
     console.log('获取到的事件统计数据:', response);
 
@@ -325,7 +331,7 @@ const loadData = async () => {
     // 确保完成率格式正确（百分比字符串）
     if (!processedData.completionRate.endsWith('%')) {
       const rate = parseFloat(processedData.completionRate);
-      processedData.completionRate = isNaN(rate) ? '0.00' : rate.toFixed(2) + '%';
+      processedData.completionRate = isNaN(rate) ? '0.00%' : rate.toFixed(2) + '%';
     }
 
     // 处理趋势数据
@@ -364,6 +370,9 @@ const loadData = async () => {
       if (hasData.value) {
         refreshCharts();
       }
+      // 确保加载状态结束
+      loading.value = false;
+      setGlobalLoading?.(false);
     });
   } catch (error) {
     console.error('加载事件统计数据失败:', error);
@@ -371,17 +380,14 @@ const loadData = async () => {
     // 设置错误状态
     setGlobalError?.('加载事件统计数据失败，请稍后重试');
 
-    // 如果数据为空，不使用示例数据，保持空状态
-    if (!stats.totalEvents && (!stats.trendData || stats.trendData.length === 0)) {
-      // 清空数据对象
-      Object.assign(stats, {
-        totalEvents: 0,
-        completedEvents: 0,
-        completionRate: '0%',
-        trendData: []
-      });
-    }
-  } finally {
+    // 即使出错也显示空数据状态，而不是一直显示加载中
+    Object.assign(stats, {
+      totalEvents: 0,
+      completedEvents: 0,
+      completionRate: '0%',
+      trendData: []
+    });
+
     // 结束加载状态
     loading.value = false;
     setGlobalLoading?.(false);
@@ -418,14 +424,14 @@ const completeLoading = () => {
 
 // 强制停止加载
 const forceStopLoading = () => {
-  console.log('强制停止加载');
+  console.log('用户强制停止加载');
 
   if (window.loadingTimeoutId) {
     clearTimeout(window.loadingTimeoutId);
     window.loadingTimeoutId = null;
   }
 
-  // 清空数据
+  // 清空数据但保持状态为可显示
   Object.assign(stats, {
     totalEvents: 0,
     completedEvents: 0,
@@ -433,12 +439,25 @@ const forceStopLoading = () => {
     trendData: []
   });
 
-  // 结束加载状态
+  // 立即结束所有加载状态
   loading.value = false;
   setGlobalLoading?.(false);
 
-  // 显示提示
-  setGlobalError?.('加载已中止，请重试或稍后再试');
+  // 清除可能的错误消息
+  error.value = null;
+  setGlobalError?.('');
+
+  // 更新图表状态
+  chartVisible.value = true;
+
+  // 生成一些最小的演示数据，让用户知道跳过加载成功了
+  setTimeout(() => {
+    // 显示提示
+    setGlobalError?.('已跳过加载，显示空数据状态');
+
+    // 通知其他组件刷新
+    window.dispatchEvent(new Event('stats-updated'));
+  }, 100);
 };
 
 // 使用自动刷新Hook
@@ -654,8 +673,8 @@ const initCompletionRateChart = () => {
 
     // 主题适配的颜色
     const textColor = isDarkTheme.value ? '#E5EAF3' : '#606266';
-    const completedColor = '#67C23A';
-    const pendingColor = '#E6A23C';
+    const completedColor = '#67C23A'; // 绿色
+    const pendingColor = '#E6A23C';   // 橙色
     const backgroundColor = isDarkTheme.value ? '#252D3C' : 'transparent';
 
     // 配置选项

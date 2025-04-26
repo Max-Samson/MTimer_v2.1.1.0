@@ -60,26 +60,35 @@ onMounted(async () => {
   isLoading.value = true;
 
   try {
-    // 最多尝试3次
-    for (let attempt = 1; attempt <= 3; attempt++) {
+    // 创建一个超时Promise，5秒后自动结束加载状态
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('初始化统计数据超时')), 5000);
+    });
+
+    // 最多尝试2次，减少等待时间
+    for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        // 使用导入的API函数
-        console.log(`尝试更新统计数据 (尝试 ${attempt}/3)...`);
-        await UpdateStats('');
+        // 使用Promise.race确保不会永久等待
+        await Promise.race([
+          // 使用导入的API函数
+          UpdateStats(''),
+          timeoutPromise
+        ]);
+
         console.log('统计数据已初始更新');
 
         // 成功后延迟一小段时间再关闭加载状态，给数据库时间处理
         setTimeout(() => {
           isLoading.value = false;
-        }, 300);
+        }, 200);
 
         return; // 成功就退出循环
       } catch (error) {
         console.warn(`第 ${attempt} 次更新统计数据失败:`, error);
 
-        if (attempt < 3) {
+        if (attempt < 2) {
           // 重试前等待一段时间，时间逐渐增加
-          const waitTime = attempt * 500; // 500ms, 1000ms
+          const waitTime = 300; // 减少等待时间
           console.log(`将在 ${waitTime}ms 后重试...`);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
@@ -88,9 +97,11 @@ onMounted(async () => {
 
     // 如果所有尝试都失败了
     console.error('更新统计数据失败，已达到最大重试次数');
-    errorMessage.value = '无法更新统计数据，请稍后再试';
+    errorMessage.value = '无法更新统计数据，请刷新页面重试';
+  } catch (e) {
+    console.error('统计数据初始化出错:', e);
   } finally {
-    // 即使失败也要关闭加载状态
+    // 无论如何都结束加载状态
     isLoading.value = false;
 
     // 确保组件可见性更新
