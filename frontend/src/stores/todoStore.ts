@@ -21,10 +21,69 @@ export const useTodoStore = defineStore('todo', () => {
   const monthlyCompletedTodos = ref<Todo[]>([])
   let currentSessionId = ref<number | null>(null)
 
+  // 保存待办事项到本地存储
+  const saveTodosToLocalStorage = () => {
+    try {
+      const todosToSave = todos.value.map(todo => ({
+        ...todo,
+        // 确保所有必要字段都存在
+        id: todo.id,
+        text: todo.text || todo.name,
+        name: todo.name || todo.text,
+        completed: todo.completed,
+        status: todo.status || (todo.completed ? 'completed' : 'pending'),
+        createdAt: todo.createdAt || Date.now(),
+        completedAt: todo.completedAt,
+        lastFocusTimestamp: todo.lastFocusTimestamp,
+        mode: todo.mode || 'pomodoro',
+        totalFocusTime: todo.totalFocusTime || 0,
+        completedPomodoros: todo.completedPomodoros || 0,
+        estimatedPomodoros: todo.estimatedPomodoros || 1
+      }));
+      localStorage.setItem('mtimer_todos', JSON.stringify(todosToSave));
+      console.log('待办事项已保存到本地存储');
+    } catch (error) {
+      console.error('保存待办事项到本地存储失败:', error);
+    }
+  }
+
+  // 从本地存储加载待办事项
+  const loadTodosFromLocalStorage = (): Todo[] => {
+    try {
+      const stored = localStorage.getItem('mtimer_todos');
+      if (stored) {
+        const parsedTodos = JSON.parse(stored);
+        console.log('从本地存储加载了待办事项:', parsedTodos.length);
+        return parsedTodos.map((todo: any) => ({
+          ...todo,
+          // 确保字段完整性
+          text: todo.text || todo.name,
+          name: todo.name || todo.text,
+          completed: todo.completed || false,
+          status: todo.status || (todo.completed ? 'completed' : 'pending'),
+          createdAt: todo.createdAt || Date.now(),
+          mode: todo.mode || 'pomodoro',
+          totalFocusTime: todo.totalFocusTime || 0,
+          completedPomodoros: todo.completedPomodoros || 0,
+          estimatedPomodoros: todo.estimatedPomodoros || 1
+        }));
+      }
+    } catch (error) {
+      console.error('从本地存储加载待办事项失败:', error);
+    }
+    return [];
+  }
+
   // 加载待办事项
   const loadTodos = async () => {
     try {
-      todos.value = await dbService.getAllTodos()
+      // 检查是否在Wails环境中
+      if (typeof window.go === 'undefined' || !window.go?.main?.App) {
+        console.log('在前端开发模式下，从本地存储加载待办事项');
+        todos.value = loadTodosFromLocalStorage();
+      } else {
+        todos.value = await dbService.getAllTodos()
+      }
 
       // 确保每个待办事项都有正确的mode属性
       todos.value.forEach(todo => {
@@ -139,6 +198,44 @@ export const useTodoStore = defineStore('todo', () => {
   // 添加待办事项
   const addTodo = async (todoData: { name: string, mode?: TimerMode, estimatedPomodoros?: number }) => {
     try {
+      const currentTime = Date.now();
+
+      // 检查是否在Wails环境中
+      if (typeof window.go === 'undefined' || !window.go?.main?.App) {
+        console.log('在前端开发模式下，使用本地存储模拟添加待办事项');
+
+        // 生成一个模拟的ID（在实际应用中应该从后端获取）
+        const mockId = Date.now() + Math.floor(Math.random() * 1000);
+
+        // 创建本地待办事项对象
+        const newTodo = {
+          id: mockId,
+          text: todoData.name,
+          name: todoData.name,
+          completed: false,
+          status: 'pending',
+          createdAt: currentTime,
+          completedAt: null,
+          lastFocusTimestamp: null,
+          mode: todoData.mode || 'pomodoro',
+          totalFocusTime: 0,
+          completedPomodoros: 0,
+          estimatedPomodoros: todoData.estimatedPomodoros || 1
+        };
+
+        // 添加到本地状态
+        todos.value.push(newTodo);
+
+        // 重新排序，确保最新的在最前面
+        todos.value.sort((a, b) => b.createdAt - a.createdAt);
+
+        // 保存到本地存储
+        saveTodosToLocalStorage();
+
+        console.log('新待办事项已添加到本地存储:', newTodo);
+        return true;
+      }
+
       // 创建待办事项请求对象
       const todoRequest = {
         name: todoData.name,
@@ -149,13 +246,11 @@ export const useTodoStore = defineStore('todo', () => {
       console.log('创建待办事项请求数据:', todoRequest);
 
       // 调用后端API创建待办事项
-      const response = await window.go!.main!.App.CreateTodo(todoRequest);
+      const response = await window.go.main.App.CreateTodo(todoRequest);
 
       if (response && response.success) {
         // 将新创建的待办事项添加到本地状态
         if (response.todo) {
-          const currentTime = Date.now();
-
           const newTodo = {
             ...response.todo,
             completedPomodoros: 0,
@@ -208,6 +303,31 @@ export const useTodoStore = defineStore('todo', () => {
     const todo = todos.value.find(todo => todo.id === id)
     if (todo) {
       const newStatus = todo.completed ? 'pending' : 'completed'
+
+      // 检查是否在Wails环境中
+      if (typeof window.go === 'undefined' || !window.go?.main?.App) {
+        console.log('在前端开发模式下，使用本地存储切换待办事项状态');
+
+        // 直接更新本地状态
+        todo.completed = !todo.completed;
+        if (todo.completed) {
+          todo.completedAt = Date.now();
+          todo.status = 'completed';
+        } else {
+          todo.completedAt = null;
+          todo.status = 'pending';
+        }
+
+        // 更新统计数据
+        updateCompletedStats();
+
+        // 保存到本地存储
+        saveTodosToLocalStorage();
+
+        console.log(`待办事项(ID:${id})状态已切换为: ${todo.status}`);
+        return true;
+      }
+
       try {
         const success = await dbService.updateTodoStatus(id, newStatus)
         if (success) {
@@ -254,12 +374,29 @@ export const useTodoStore = defineStore('todo', () => {
   // 清除所有已完成的待办事项
   const clearCompleted = async () => {
     try {
+      // 检查是否在Wails环境中
+      if (typeof window.go === 'undefined' || !window.go?.main?.App) {
+        console.log('在前端开发模式下，使用本地存储清除已完成的待办事项');
+
+        // 统计要清除的数量
+        const completedCount = todos.value.filter(todo => todo.completed).length;
+
+        // 从本地状态中移除已完成的待办事项
+        todos.value = todos.value.filter(todo => !todo.completed);
+
+        // 保存到本地存储
+        saveTodosToLocalStorage();
+
+        console.log(`已清除${completedCount}个已完成的待办事项`);
+        return true;
+      }
+
       // 找出所有已完成的待办事项
       const completedTodos = todos.value.filter(todo => todo.completed)
 
       // 逐个删除已完成的待办事项
       for (const todo of completedTodos) {
-        await window.go!.main!.App.DeleteTodo(todo.id)
+        await window.go.main.App.DeleteTodo(todo.id)
       }
 
       // 从本地状态中移除已完成的待办事项
