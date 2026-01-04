@@ -74,6 +74,12 @@ go.work.sum
 *.avi
 *.flac
 
+# 明确排除大音频文件（超过GitHub限制的文件）
+frontend/public/sounds/hildegard_beats__oceano1.wav
+frontend/public/sounds/josefpres__piano-loops-186-octave-down-long-loop-120-bpm.wav
+frontend/public/sounds/river-maas-summer.wav
+frontend/public/sounds/zhr__chill-background-music-3.wav
+
 
 
 ################################
