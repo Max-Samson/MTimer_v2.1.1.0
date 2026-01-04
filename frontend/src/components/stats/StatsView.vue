@@ -64,20 +64,21 @@ const refreshStats = async () => {
   errorMessage.value = '';
 
   try {
-    // 使用导入的API函数更新统计
+    // 使用导入的API函数更新统计 (后端重新计算)
     await UpdateStats('');
-    console.log('[StatsView] 统计数据更新成功');
+    console.log('[StatsView] 统计数据后端同步成功');
     
     // 更新最后刷新时间
     updateLastRefreshTime();
     
-    // 通过事件总线通知所有子组件刷新
+    // 通过事件总线通知所有子组件强制刷新
+    console.log('[StatsView] 触发 STATS_UPDATED 事件通知子组件');
     eventBus.emit(EventNames.STATS_UPDATED);
     
     // 延迟一小段时间再关闭加载状态，确保子组件有时间获取新数据
     setTimeout(() => {
       isLoading.value = false;
-    }, 200);
+    }, 500); // 增加一点等待时间
   } catch (error) {
     console.error('[StatsView] 更新统计数据失败:', error);
     errorMessage.value = '无法更新统计数据，请稍后重试';

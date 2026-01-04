@@ -118,11 +118,11 @@ const hasTrendData = computed(() => {
 });
 
 // 获取统计数据
-const fetchData = async () => {
+const fetchData = async (force: boolean = false) => {
   loading.value = true;
   try {
     // 获取统计摘要
-    const summaryData = await dbService.getStatsSummary();
+    const summaryData = await dbService.getStatsSummary(force);
     if (summaryData) {
       summary.value = summaryData;
       console.log('摘要数据加载成功:', JSON.stringify(summary.value));
@@ -132,7 +132,7 @@ const fetchData = async () => {
 
     // 获取周趋势数据
     console.log('开始获取周趋势数据...');
-    const trendData = await dbService.getDailySummary();
+    const trendData = await dbService.getDailySummary(force);
     console.log('DailySummary 组件收到的周趋势数据:', JSON.stringify(trendData));
 
     // 验证weekTrend属性
@@ -193,15 +193,15 @@ const fetchData = async () => {
 // 刷新数据
 const refreshData = () => {
   loading.value = true;
-  fetchData().finally(() => {
+  fetchData(true).finally(() => {
     loading.value = false;
   });
 };
 
 // 处理统计数据更新事件
 const handleStatsUpdated = () => {
-  console.log('[DailySummary] 收到统计数据更新通知，刷新数据');
-  refreshData();
+  console.log('[DailySummary] 收到统计数据更新通知，强制刷新数据');
+  fetchData(true);
 };
 
 // 设置自动刷新

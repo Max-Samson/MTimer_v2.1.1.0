@@ -79,7 +79,7 @@ func (r *DailyStatRepository) GetByDateRange(startDate, endDate string) ([]Daily
 // 应该在每次专注会话结束时调用
 func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	// 获取指定日期的所有专注会话
-	rows, err := DB.Query(`
+	rows, err := r.db.Query(`
 		SELECT
 			start_time, end_time, break_time, duration, mode
 		FROM focus_sessions
@@ -144,14 +144,14 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 
 	// 检查该日期是否已有记录
 	var count int
-	err = DB.QueryRow(`SELECT COUNT(*) FROM daily_stats WHERE date = ?`, date).Scan(&count)
+	err = r.db.QueryRow(`SELECT COUNT(*) FROM daily_stats WHERE date = ?`, date).Scan(&count)
 	if err != nil {
 		return err
 	}
 
 	if count > 0 {
 		// 更新现有记录
-		_, err = DB.Exec(`
+		_, err = r.db.Exec(`
 			UPDATE daily_stats
 			SET
 				pomodoro_count = ?,
@@ -178,7 +178,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		)
 	} else {
 		// 插入新记录
-		_, err = DB.Exec(`
+		_, err = r.db.Exec(`
 			INSERT INTO daily_stats (
 				date, pomodoro_count, custom_count,
 				total_focus_sessions, pomodoro_minutes, custom_minutes,

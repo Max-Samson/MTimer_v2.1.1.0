@@ -35,7 +35,7 @@ func (r *EventStatRepository) UpdateEventStats(todoID int64, date string) error 
 	var status string
 	var isCompleted bool
 
-	err := DB.QueryRow(`
+	err := r.db.QueryRow(`
 		SELECT mode, status FROM todos WHERE todo_id = ?
 	`, todoID).Scan(&mode, &status)
 
@@ -46,10 +46,10 @@ func (r *EventStatRepository) UpdateEventStats(todoID int64, date string) error 
 	isCompleted = (status == "completed")
 
 	// 获取该任务在指定日期的专注会话数据
-	rows, err := DB.Query(`
+	rows, err := r.db.Query(`
 		SELECT COUNT(*), SUM(duration)
 		FROM focus_sessions
-		WHERE todo_id = ? AND DATE(start_time) = ? AND end_time IS NOT NULL
+		WHERE todo_id = ? AND date = ? AND end_time IS NOT NULL
 	`, todoID, date)
 
 	if err != nil {
@@ -71,7 +71,7 @@ func (r *EventStatRepository) UpdateEventStats(todoID int64, date string) error 
 
 	// 检查是否已有记录
 	var count int
-	err = DB.QueryRow(`
+	err = r.db.QueryRow(`
 		SELECT COUNT(*) FROM event_stats
 		WHERE event_id = ? AND date = ?
 	`, todoID, date).Scan(&count)
@@ -82,14 +82,14 @@ func (r *EventStatRepository) UpdateEventStats(todoID int64, date string) error 
 
 	// 插入或更新记录
 	if count > 0 {
-		_, err = DB.Exec(`
+		_, err = r.db.Exec(`
 			UPDATE event_stats
 			SET focus_count = ?, total_focus_time = ?, mode = ?, completed = ?
 			WHERE event_id = ? AND date = ?
 		`, focusCount, totalFocusTime, mode, isCompleted, todoID, date)
 	} else if focusCount > 0 {
 		// 只有在有专注记录时才创建统计记录
-		_, err = DB.Exec(`
+		_, err = r.db.Exec(`
 			INSERT INTO event_stats (event_id, date, focus_count, total_focus_time, mode, completed)
 			VALUES (?, ?, ?, ?, ?, ?)
 		`, todoID, date, focusCount, totalFocusTime, mode, isCompleted)

@@ -616,7 +616,7 @@ const changeTimeFilter = (filterValue: string) => {
 };
 
 // 加载番茄数据
-const loadData = async () => {
+const loadData = async (force: boolean = false) => {
   loading.value = true;
 
   try {
@@ -649,7 +649,7 @@ const loadData = async () => {
         break;
     }
 
-    console.log(`加载番茄统计数据，开始日期: ${start}, 结束日期: ${end}`);
+    console.log(`加载番茄统计数据，开始日期: ${start}, 结束日期: ${end}, 强制更新: ${force}`);
 
     // 销毁现有图表实例，确保重新创建
     if (pomodoroTrendChartInstance) {
@@ -663,7 +663,7 @@ const loadData = async () => {
     }
 
     // 调用API获取数据
-    const data = await dbService.getPomodoroStats(start, end);
+    const data = await dbService.getPomodoroStats(start, end, force);
     console.log("获取到的番茄统计数据:", data);
 
     // 检查数据是否有效
@@ -806,15 +806,15 @@ const refreshData = () => {
   }
 
   dataRefreshKey.value++;
-  loadData().finally(() => {
+  loadData(true).finally(() => {
     console.log("刷新完成");
   });
 };
 
 // 处理统计数据更新事件
 const handleStatsUpdated = () => {
-  console.log('[PomodoroStats] 收到统计数据更新通知，刷新数据');
-  refreshData();
+  console.log('[PomodoroStats] 收到统计数据更新通知，强制刷新数据');
+  loadData(true);
 };
 
 // 设置自动刷新

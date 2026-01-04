@@ -137,15 +137,14 @@ class DatabaseService {
 
   /**
    * 统一的统计数据更新方法
-   * 使用防抖机制避免频繁调用
+   * @param force 是否强制更新，绕过防抖
    */
-  private async updateStatsIfNeeded(): Promise<boolean> {
+  private async updateStatsIfNeeded(force: boolean = false): Promise<boolean> {
     const now = Date.now();
     
     // 如果正在更新中，等待完成
     if (this.isUpdatingStats) {
       console.log('[DatabaseService] 统计数据正在更新中，等待完成...');
-      // 等待最多3秒
       const startWait = Date.now();
       while (this.isUpdatingStats && (Date.now() - startWait < 3000)) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -153,8 +152,8 @@ class DatabaseService {
       return !this.isUpdatingStats;
     }
 
-    // 检查是否需要更新（防抖）
-    if (now - this.lastUpdateTime < this.updateStatsDebounceTime) {
+    // 检查是否需要更新（防抖），如果是强制更新则跳过检查
+    if (!force && (now - this.lastUpdateTime < this.updateStatsDebounceTime)) {
       console.log(`[DatabaseService] 距离上次更新仅${now - this.lastUpdateTime}ms，跳过更新`);
       return true;
     }
@@ -389,7 +388,7 @@ class DatabaseService {
   }
 
   // 获取每日摘要
-  async getDailySummary(): Promise<DailySummaryResponse> {
+  async getDailySummary(force: boolean = false): Promise<DailySummaryResponse> {
     try {
       // 检查是否处于开发模式
       if (!App) {
@@ -412,7 +411,7 @@ class DatabaseService {
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded();
+      await this.updateStatsIfNeeded(force);
 
       // 获取每日摘要数据
       console.log('获取每日摘要数据...');
@@ -517,8 +516,8 @@ class DatabaseService {
     }
   }
 
-  async getEventStats(startDate: string, endDate: string): Promise<EventStatsResponse> {
-    console.log(`开始获取事件统计数据，时间范围：${startDate} - ${endDate}`);
+  async getEventStats(startDate: string, endDate: string, force: boolean = false): Promise<EventStatsResponse> {
+    console.log(`开始获取事件统计数据，时间范围：${startDate} - ${endDate}, 强制更新: ${force}`);
 
     try {
       // 确保App已绑定
@@ -531,6 +530,9 @@ class DatabaseService {
           trendData: []
         };
       }
+
+      // 使用统一的更新方法
+      await this.updateStatsIfNeeded(force);
 
       // 获取真实数据
       console.log("从数据库获取事件统计数据...");
@@ -584,16 +586,16 @@ class DatabaseService {
   }
 
   // 获取番茄统计数据
-  async getPomodoroStats(startDate: string, endDate: string): Promise<PomodoroStatsResponse> {
+  async getPomodoroStats(startDate: string, endDate: string, force: boolean = false): Promise<PomodoroStatsResponse> {
     try {
-      console.log(`获取番茄统计数据，开始日期: ${startDate}, 结束日期: ${endDate}`);
+      console.log(`获取番茄统计数据，开始日期: ${startDate}, 结束日期: ${endDate}, 强制更新: ${force}`);
       // 检查是否处于开发模式
       if (!App) {
         return this.getEmptyPomodoroStats();
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded();
+      await this.updateStatsIfNeeded(force);
 
       // 请求参数
       const request = {
@@ -720,7 +722,7 @@ class DatabaseService {
   }
 
   // 获取统计摘要数据
-  async getStatsSummary(): Promise<any> {
+  async getStatsSummary(force: boolean = false): Promise<any> {
     try {
       // 确保App已绑定
       if (!App) {
@@ -737,7 +739,7 @@ class DatabaseService {
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded();
+      await this.updateStatsIfNeeded(force);
 
       console.log('从数据库获取统计摘要数据');
 

@@ -276,14 +276,14 @@ const updateChartsTheme = () => {
 };
 
 // 加载数据
-const loadData = async () => {
+const loadData = async (force: boolean = false) => {
   // 如果已经在加载中，则跳过
   if (loading.value) {
     console.log('数据正在加载中，跳过此次刷新');
     return;
   }
 
-  console.log(`开始加载事件统计数据，时间范围: ${startDate.value} - ${endDate.value}`);
+  console.log(`开始加载事件统计数据，时间范围: ${startDate.value} - ${endDate.value}, 强制更新: ${force}`);
   loading.value = true;
   error.value = null;
 
@@ -294,7 +294,7 @@ const loadData = async () => {
   try {
     // 直接获取数据，不再使用超时和 Promise.race
     console.time('[EventStats] 获取事件统计数据');
-    const response = await dbService.getEventStats(startDate.value, endDate.value);
+    const response = await dbService.getEventStats(startDate.value, endDate.value, force);
     console.timeEnd('[EventStats] 获取事件统计数据');
     console.log('[EventStats] 获取到的事件统计数据:', response);
 
@@ -446,14 +446,14 @@ const forceStopLoading = () => {
 
 // 处理统计数据更新事件
 const handleStatsUpdated = () => {
-  console.log('[EventStats] 收到统计数据更新通知，刷新数据');
-  loadData();
+  console.log('[EventStats] 收到统计数据更新通知，强制刷新数据');
+  loadData(true);
 };
 
 // 手动刷新数据
 const refreshData = () => {
   console.log('[EventStats] 手动刷新数据');
-  loadData();
+  loadData(true);
 };
 
 // 使用自动刷新Hook
