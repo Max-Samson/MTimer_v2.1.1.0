@@ -114,6 +114,7 @@ import { formatMinutes, formatDateShort } from '../../utils/formatters';
 import { logger } from '../../utils/logger';
 import BaseChart from '../common/BaseChart.vue';
 import { useChartsTheme } from '../../hooks/useChartsTheme';
+import { eventBus, EventNames } from '../../utils/eventBus';
 
 // 扩展Window接口，添加loadingTimeoutId属性
 declare global {
@@ -291,28 +292,11 @@ const loadData = async () => {
   setGlobalError?.('');
 
   try {
-    // 设置加载超时处理，5秒后强制结束加载状态
-    const timeoutId = setTimeout(() => {
-      if (loading.value) {
-        console.warn('数据加载超时，自动停止加载');
-        completeLoading();
-      }
-    }, 5000); // 将超时时间从15秒减少到5秒
-
-    // 直接获取数据
-    console.time('获取事件统计数据');
-    const response = await Promise.race([
-      dbService.getEventStats(startDate.value, endDate.value),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('请求超时')), 4000)
-      )
-    ]) as EventStatsResponse;
-
-    console.timeEnd('获取事件统计数据');
-    console.log('获取到的事件统计数据:', response);
-
-    // 清除超时计时器
-    clearTimeout(timeoutId);
+    // 直接获取数据，不再使用超时和 Promise.race
+    console.time('[EventStats] 获取事件统计数据');
+    const response = await dbService.getEventStats(startDate.value, endDate.value);
+    console.timeEnd('[EventStats] 获取事件统计数据');
+    console.log('[EventStats] 获取到的事件统计数据:', response);
 
     // 检查数据是否有效
     if (!response) {
@@ -460,15 +444,26 @@ const forceStopLoading = () => {
   }, 100);
 };
 
+// 处理统计数据更新事件
+const handleStatsUpdated = () => {
+  console.log('[EventStats] 收到统计数据更新通知，刷新数据');
+  loadData();
+};
+
+// 手动刷新数据
+const refreshData = () => {
+  console.log('[EventStats] 手动刷新数据');
+  loadData();
+};
+
 // 使用自动刷新Hook
 const {
   isRefreshing,
-  refresh: refreshData,
   isAutoRefreshEnabled,
   toggleAutoRefresh
 } = useAutoRefresh(loadData, {
   componentName: 'EventStats',
-  interval: 5 * 60 * 1000, // 5分钟刷新一次
+  interval: 30 * 1000, // 从5分钟改为30秒
   enableFocusRefresh: true,
   initialRefresh: true
 });
@@ -515,24 +510,16 @@ const handleVisibilityChange = () => {
   }
 };
 
-// 定义数据更新事件处理函数
-const handleStatsUpdated = () => {
-  console.log('检测到统计数据更新事件，刷新数据');
-  // 使用防抖函数，避免短时间内多次刷新
-  if (window.refreshDataTimeout) {
-    clearTimeout(window.refreshDataTimeout);
-  }
-  window.refreshDataTimeout = setTimeout(() => {
-    refreshData();
-  }, 500);
-};
 
 // 组件挂载时加载数据并添加事件监听
 onMounted(() => {
+  // 订阅事件总线的统计数据更新事件
+  eventBus.on(EventNames.STATS_UPDATED, handleStatsUpdated);
+  
   // 初始加载数据
   loadData();
 
-  // 监听统计数据更新事件
+  // 监听统计数据更新事件（兼容旧的window事件）
   window.addEventListener('stats-updated', handleStatsUpdated);
 
   // 添加可见性变化监听，当页面可见时刷新数据
@@ -541,6 +528,9 @@ onMounted(() => {
 
 // 组件卸载时清理事件监听
 onBeforeUnmount(() => {
+  // 取消事件总线订阅
+  eventBus.off(EventNames.STATS_UPDATED, handleStatsUpdated);
+  
   window.removeEventListener('resize', handleResize);
   document.documentElement.removeEventListener('data-theme-changed', updateChartsTheme);
   window.removeEventListener('stats-updated', handleStatsUpdated);

@@ -64,6 +64,7 @@ import { Timer, CheckmarkDone, TimeOutline } from '@vicons/ionicons5';
 import WeekTrendChart from './WeekTrendChart.vue';
 import dbService from '../../services/DatabaseService';
 import type { DailyTrendData } from '../../services/DatabaseService';
+import { eventBus, EventNames } from '../../utils/eventBus';
 
 // 定义StatSummary类型
 interface StatSummary {
@@ -197,39 +198,59 @@ const refreshData = () => {
   });
 };
 
+// 处理统计数据更新事件
+const handleStatsUpdated = () => {
+  console.log('[DailySummary] 收到统计数据更新通知，刷新数据');
+  refreshData();
+};
+
 // 设置自动刷新
+let refreshInterval: number | null = null;
+
 const setupAutoRefresh = () => {
   // 当窗口重新获得焦点时刷新数据
-  window.addEventListener('focus', () => {
-    console.log("窗口获得焦点，自动刷新数据");
+  const handleFocus = () => {
+    console.log('[DailySummary] 窗口获得焦点，自动刷新数据');
     refreshData();
-  });
+  };
+  window.addEventListener('focus', handleFocus);
 
-  // 设置定时器定期刷新数据（每5分钟一次）
-  const interval = setInterval(() => {
-    console.log("定时刷新数据");
+  // 设置定时器定期刷新数据（每30秒一次）
+  refreshInterval = window.setInterval(() => {
+    console.log('[DailySummary] 定时自动刷新数据');
     refreshData();
-  }, 5 * 60 * 1000);
+  }, 30 * 1000); // 从5分钟改为30秒
 
   // 组件卸载时清理
   onBeforeUnmount(() => {
-    window.removeEventListener('focus', refreshData);
-    clearInterval(interval);
+    window.removeEventListener('focus', handleFocus);
+    if (refreshInterval) {
+      clearInterval(refreshInterval);
+    }
   });
 };
 
 // 组件挂载时获取数据
 onMounted(() => {
+  // 订阅统计数据更新事件
+  eventBus.on(EventNames.STATS_UPDATED, handleStatsUpdated);
+  
   // 使用setTimeout确保DOM已渲染
   setTimeout(() => {
-    console.log('DailySummary组件已挂载，开始获取数据');
+    console.log('[DailySummary] 组件已挂载，开始获取数据');
     fetchData().then(() => {
-      console.log('初始数据加载完成');
+      console.log('[DailySummary] 初始数据加载完成');
     }).catch(error => {
-      console.error('初始数据加载失败:', error);
+      console.error('[DailySummary] 初始数据加载失败:', error);
     });
     setupAutoRefresh();
   }, 100);
+});
+
+// 组件卸载前清理
+onBeforeUnmount(() => {
+  // 取消事件订阅
+  eventBus.off(EventNames.STATS_UPDATED, handleStatsUpdated);
 });
 </script>
 

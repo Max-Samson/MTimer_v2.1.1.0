@@ -130,6 +130,57 @@ export interface GetStatsRequest {
 
 // 数据库服务类，提供与SQLite数据库的交互方法
 class DatabaseService {
+  // 统计数据更新状态管理
+  private isUpdatingStats = false;
+  private lastUpdateTime = 0;
+  private updateStatsDebounceTime = 2000; // 2秒内不重复更新
+
+  /**
+   * 统一的统计数据更新方法
+   * 使用防抖机制避免频繁调用
+   */
+  private async updateStatsIfNeeded(): Promise<boolean> {
+    const now = Date.now();
+    
+    // 如果正在更新中，等待完成
+    if (this.isUpdatingStats) {
+      console.log('[DatabaseService] 统计数据正在更新中，等待完成...');
+      // 等待最多3秒
+      const startWait = Date.now();
+      while (this.isUpdatingStats && (Date.now() - startWait < 3000)) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      return !this.isUpdatingStats;
+    }
+
+    // 检查是否需要更新（防抖）
+    if (now - this.lastUpdateTime < this.updateStatsDebounceTime) {
+      console.log(`[DatabaseService] 距离上次更新仅${now - this.lastUpdateTime}ms，跳过更新`);
+      return true;
+    }
+
+    // 执行更新
+    this.isUpdatingStats = true;
+    this.lastUpdateTime = now;
+    
+    try {
+      if (!App) {
+        console.warn('[DatabaseService] App未绑定，无法更新统计数据');
+        return false;
+      }
+
+      console.log('[DatabaseService] 开始更新后端统计数据...');
+      const appAny = App as any;
+      await appAny.UpdateStats();
+      console.log('[DatabaseService] 统计数据更新成功');
+      return true;
+    } catch (error) {
+      console.error('[DatabaseService] 更新统计数据失败:', error);
+      return false;
+    } finally {
+      this.isUpdatingStats = false;
+    }
+  }
   // 获取所有待办事项
   async getAllTodos(): Promise<Todo[]> {
     try {
@@ -360,14 +411,8 @@ class DatabaseService {
         };
       }
 
-      // 先尝试更新统计数据，以确保获取最新数据
-      try {
-        const appAny = App as any;
-        await appAny.UpdateStats();
-        console.log('统计数据已更新');
-      } catch (updateErr) {
-        console.warn('更新统计数据失败，将使用现有数据:', updateErr);
-      }
+      // 使用统一的更新方法
+      await this.updateStatsIfNeeded();
 
       // 获取每日摘要数据
       console.log('获取每日摘要数据...');
@@ -472,32 +517,13 @@ class DatabaseService {
     }
   }
 
-  private mockEventStatsCache: EventStatsResponse | null = null;
-  private eventStatsCache: Map<string, {data: EventStatsResponse, timestamp: number}> = new Map();
-  private lastRefreshTime = 0;
-  private minRefreshInterval = 10000; // 降低最小刷新间隔为10秒，提高响应速度
-
   async getEventStats(startDate: string, endDate: string): Promise<EventStatsResponse> {
     console.log(`开始获取事件统计数据，时间范围：${startDate} - ${endDate}`);
-
-    // 生成缓存键
-    const cacheKey = `${startDate}_${endDate}`;
-    const now = Date.now();
-
-    // 检查是否有有效缓存
-    const cachedData = this.eventStatsCache.get(cacheKey);
-    if (cachedData && (now - cachedData.timestamp < this.minRefreshInterval)) {
-      console.log(`使用缓存的事件统计数据，缓存时间: ${new Date(cachedData.timestamp).toLocaleTimeString()}`);
-      return cachedData.data;
-    }
-
-    console.log(`缓存过期或不存在，从后端获取最新数据`);
 
     try {
       // 确保App已绑定
       if (!App) {
         console.error('App未绑定，无法获取数据库数据');
-        // 返回空数据结构
         return {
           totalEvents: 0,
           completedEvents: 0,
@@ -506,63 +532,19 @@ class DatabaseService {
         };
       }
 
-      // 尝试强制更新后端统计数据，但设置超时
-      try {
-        console.log("尝试更新后端统计数据...");
-        const updatePromise = (App as any).UpdateStats('');
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('更新统计数据超时')), 3000)
-        );
-
-        await Promise.race([updatePromise, timeoutPromise]);
-        console.log("后端统计数据已更新");
-      } catch (updateError) {
-        console.warn("更新后端统计数据失败或超时:", updateError);
-        // 继续执行，尝试获取现有数据
-      }
-
-      // 获取真实数据，设置超时
+      // 获取真实数据
       console.log("从数据库获取事件统计数据...");
-      let response: any;
-
-      try {
-        // 设置API调用超时
-        const apiPromise = (App as any).GetEventStats({
-          start_date: startDate,
-          end_date: endDate
-        });
-
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('获取事件统计数据超时')), 3000)
-        );
-
-        // 使用Promise.race确保API调用不会永久挂起
-        response = await Promise.race([apiPromise, timeoutPromise]);
-        console.log("GetEventStats API返回结果:", response);
-      } catch (err) {
-        console.warn("GetEventStats API调用失败:", err);
-
-        // 如果有缓存数据，在API调用失败时返回缓存
-        if (cachedData) {
-          console.log("API调用失败，返回缓存数据");
-          return cachedData.data;
-        }
-
-        // 无缓存时返回空数据
-        return {
-          totalEvents: 0,
-          completedEvents: 0,
-          completionRate: '0%',
-          trendData: []
-        };
-      }
+      const response = await (App as any).GetEventStats({
+        start_date: startDate,
+        end_date: endDate
+      });
+      
+      console.log("GetEventStats API返回结果:", response);
 
       // 确保响应数据有效
       if (!response) {
         console.warn('后端返回的事件统计数据为空');
-
-        // 返回空数据或缓存数据
-        return cachedData ? cachedData.data : {
+        return {
           totalEvents: 0,
           completedEvents: 0,
           completionRate: '0%',
@@ -588,21 +570,10 @@ class DatabaseService {
         result.completionRate = `${result.completionRate}%`;
       }
 
-      // 更新缓存
-      this.eventStatsCache.set(cacheKey, { data: result, timestamp: now });
-      console.log(`已将最新数据存入缓存，缓存时间: ${new Date(now).toLocaleTimeString()}`);
-
+      console.log('处理后的事件统计数据:', result);
       return result;
     } catch (error) {
       console.error("获取事件统计数据时出错:", error);
-
-      // 如果有缓存数据，在出错时返回过期缓存
-      if (cachedData) {
-        console.log("由于错误，返回过期缓存数据");
-        return cachedData.data;
-      }
-
-      // 返回空数据结构
       return {
         totalEvents: 0,
         completedEvents: 0,
@@ -621,14 +592,8 @@ class DatabaseService {
         return this.getEmptyPomodoroStats();
       }
 
-      // 先尝试更新统计数据，以确保获取最新数据
-      try {
-        const appAny = App as any;
-        await appAny.UpdateStats();
-        console.log('番茄统计数据已更新');
-      } catch (updateErr) {
-        console.warn('更新番茄统计数据失败，将使用现有数据:', updateErr);
-      }
+      // 使用统一的更新方法
+      await this.updateStatsIfNeeded();
 
       // 请求参数
       const request = {
@@ -698,17 +663,7 @@ class DatabaseService {
         console.log('处理后的番茄趋势数据:', JSON.stringify(result.trendData));
         const hasTomatoHarvests = result.trendData.some(item => (item.tomatoHarvests || 0) > 0);
         if (!hasTomatoHarvests) {
-          console.warn('番茄收成数据都为0，可能导致图表无法正常显示');
-
-          // 如果后端数据不完整，模拟一些趋势数据以确保图表可以显示
-          if (result.trendData.length > 0) {
-            console.log('添加模拟的番茄收成数据以确保图表显示');
-            result.trendData = result.trendData.map((item, index) => ({
-              ...item,
-              tomatoHarvests: Math.max((item.tomatoHarvests || 0), index % 4 + 1), // 确保每天至少有1-4个番茄收成
-              pomodoroCount: Math.max((item.pomodoroCount || 0), index % 5 + 2)    // 确保每天至少有2-6次专注
-            }));
-          }
+          console.warn('番茄收成数据都为0，这是真实的数据状态');
         }
       }
 
@@ -781,14 +736,8 @@ class DatabaseService {
         };
       }
 
-      // 先尝试更新统计数据，以确保获取最新数据
-      try {
-        const appAny = App as any;
-        await appAny.UpdateStats();
-        console.log('统计数据已更新');
-      } catch (updateErr) {
-        console.warn('更新统计数据失败，将使用现有数据:', updateErr);
-      }
+      // 使用统一的更新方法
+      await this.updateStatsIfNeeded();
 
       console.log('从数据库获取统计摘要数据');
 

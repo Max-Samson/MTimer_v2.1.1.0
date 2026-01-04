@@ -21,9 +21,11 @@ import { NCard, NTabs, NTabPane } from 'naive-ui';
 import DailySummary from './DailySummary.vue';
 import PomodoroStats from './PomodoroStats.vue';
 import EventStats from './EventStats.vue';
-import { provide, ref, onMounted, nextTick } from 'vue';
+import { provide, ref, onMounted, onBeforeUnmount, nextTick } from 'vue';
 // 导入必要的API函数
 import { UpdateStats } from '../../../wailsjs/go/main/App';
+// 导入事件总线
+import { eventBus, EventNames } from '../../utils/eventBus';
 
 // 提供全局加载状态
 const isLoading = ref(false);
@@ -55,61 +57,59 @@ provide('setGlobalLoading', setGlobalLoading);
 provide('setGlobalError', setGlobalError);
 provide('updateLastRefreshTime', updateLastRefreshTime);
 
-// 组件挂载时尝试更新统计数据，添加重试机制
-onMounted(async () => {
+// 刷新统计数据的方法
+const refreshStats = async () => {
+  console.log('[StatsView] 开始刷新统计数据');
   isLoading.value = true;
+  errorMessage.value = '';
 
   try {
-    // 创建一个超时Promise，5秒后自动结束加载状态
-    const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error('初始化统计数据超时')), 5000);
-    });
-
-    // 最多尝试2次，减少等待时间
-    for (let attempt = 1; attempt <= 2; attempt++) {
-      try {
-        // 使用Promise.race确保不会永久等待
-        await Promise.race([
-          // 使用导入的API函数
-          UpdateStats(''),
-          timeoutPromise
-        ]);
-
-        console.log('统计数据已初始更新');
-
-        // 成功后延迟一小段时间再关闭加载状态，给数据库时间处理
-        setTimeout(() => {
-          isLoading.value = false;
-        }, 200);
-
-        return; // 成功就退出循环
-      } catch (error) {
-        console.warn(`第 ${attempt} 次更新统计数据失败:`, error);
-
-        if (attempt < 2) {
-          // 重试前等待一段时间，时间逐渐增加
-          const waitTime = 300; // 减少等待时间
-          console.log(`将在 ${waitTime}ms 后重试...`);
-          await new Promise(resolve => setTimeout(resolve, waitTime));
-        }
-      }
-    }
-
-    // 如果所有尝试都失败了
-    console.error('更新统计数据失败，已达到最大重试次数');
-    errorMessage.value = '无法更新统计数据，请刷新页面重试';
-  } catch (e) {
-    console.error('统计数据初始化出错:', e);
-  } finally {
-    // 无论如何都结束加载状态
+    // 使用导入的API函数更新统计
+    await UpdateStats('');
+    console.log('[StatsView] 统计数据更新成功');
+    
+    // 更新最后刷新时间
+    updateLastRefreshTime();
+    
+    // 通过事件总线通知所有子组件刷新
+    eventBus.emit(EventNames.STATS_UPDATED);
+    
+    // 延迟一小段时间再关闭加载状态，确保子组件有时间获取新数据
+    setTimeout(() => {
+      isLoading.value = false;
+    }, 200);
+  } catch (error) {
+    console.error('[StatsView] 更新统计数据失败:', error);
+    errorMessage.value = '无法更新统计数据，请稍后重试';
     isLoading.value = false;
-
-    // 确保组件可见性更新
-    nextTick(() => {
-      // 触发一个DOM事件，通知各子组件进行数据刷新
-      window.dispatchEvent(new Event('stats-updated'));
-    });
   }
+};
+
+// 监听来自其他组件的刷新请求
+const handleRefreshRequest = () => {
+  console.log('[StatsView] 收到数据刷新请求');
+  refreshStats();
+};
+
+// 组件挂载时初始化
+onMounted(async () => {
+  // 订阅刷新请求事件
+  eventBus.on(EventNames.REQUEST_DATA_REFRESH, handleRefreshRequest);
+  eventBus.on(EventNames.FOCUS_SESSION_COMPLETED, handleRefreshRequest);
+  eventBus.on(EventNames.POMODORO_COMPLETED, handleRefreshRequest);
+  eventBus.on(EventNames.TODO_COMPLETED, handleRefreshRequest);
+  
+  // 初始化时刷新一次
+  await refreshStats();
+});
+
+// 组件卸载前清理
+onBeforeUnmount(() => {
+  // 取消事件订阅
+  eventBus.off(EventNames.REQUEST_DATA_REFRESH, handleRefreshRequest);
+  eventBus.off(EventNames.FOCUS_SESSION_COMPLETED, handleRefreshRequest);
+  eventBus.off(EventNames.POMODORO_COMPLETED, handleRefreshRequest);
+  eventBus.off(EventNames.TODO_COMPLETED, handleRefreshRequest);
 });
 </script>
 
