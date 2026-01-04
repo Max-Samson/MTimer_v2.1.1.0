@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import dbService, { Todo } from '../services/DatabaseService'
 import { TimerMode } from './timerStore'
+import { eventBus, EventNames } from '../utils/eventBus'
 
 export interface TimerSettings {
   workTime: number
@@ -619,6 +620,10 @@ export const useTodoStore = defineStore('todo', () => {
 
         // 重新加载待办事项
         await loadTodos();
+
+        // 触发全局事件通知统计模块刷新数据
+        console.log('触发 FOCUS_SESSION_COMPLETED 事件刷新统计');
+        eventBus.emit(EventNames.FOCUS_SESSION_COMPLETED);
 
         // 恢复当前任务的预计专注次数，以免被后端数据覆盖
         if (currentTodoId) {

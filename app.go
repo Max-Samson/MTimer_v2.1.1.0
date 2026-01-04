@@ -46,9 +46,8 @@ func (a *App) startup(ctx context.Context) {
 	container := di.New()
 
 	// 注册数据库适配器
-	container.Provide(func() di.Database {
-		return di.NewDatabaseAdapter(models.GetSQLDB())
-	})
+	dbAdapter := di.NewDatabaseAdapter(models.GetSQLDB())
+	container.Provide(dbAdapter)
 
 	// 创建Repository实例
 	todoRepo := models.NewTodoRepository(models.GetDB())
@@ -57,19 +56,28 @@ func (a *App) startup(ctx context.Context) {
 	eventStatRepo := models.NewEventStatRepository(models.GetDB())
 
 	// 注册事务管理器
-	container.Provide(func(db di.Database) di.TransactionManager {
-		return di.NewTransactionManager(db)
-	})
+	txManager := di.NewTransactionManager(dbAdapter)
+	container.Provide(txManager)
 
 	// 注册Repository
-	container.Provide(func() *models.TodoRepository { return todoRepo })
-	container.Provide(func() *models.FocusSessionRepository { return focusSessionRepo })
-	container.Provide(func() *models.DailyStatRepository { return dailyStatRepo })
-	container.Provide(func() *models.EventStatRepository { return eventStatRepo })
+	container.Provide(todoRepo)
+	container.Provide(focusSessionRepo)
+	container.Provide(dailyStatRepo)
+	container.Provide(eventStatRepo)
 
-	// 初始化控制器
-	a.todoController = container.MustResolve((*controllers.TodoController)(nil)).(*controllers.TodoController)
-	a.statController = container.MustResolve((*controllers.StatsController)(nil)).(*controllers.StatsController)
+	// 手动创建控制器（因为它们需要多个依赖）
+	a.todoController = controllers.NewTodoController(
+		todoRepo,
+		focusSessionRepo,
+		dailyStatRepo,
+		eventStatRepo,
+		txManager,
+	)
+	a.statController = controllers.NewStatsController(
+		dailyStatRepo,
+		focusSessionRepo,
+		eventStatRepo,
+	)
 	a.aiController = &controllers.AIController{}
 
 	log.Println("应用启动成功")

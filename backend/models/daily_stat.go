@@ -83,7 +83,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		SELECT
 			start_time, end_time, break_time, duration, mode
 		FROM focus_sessions
-		WHERE DATE(start_time) = ? AND end_time IS NOT NULL
+		WHERE date = ? AND end_time IS NOT NULL
 	`, date)
 
 	if err != nil {
@@ -105,16 +105,22 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		}
 
 		// 解析时间
-		start, _ := time.Parse(time.RFC3339, startTime)
-		end, _ := time.Parse(time.RFC3339, endTime)
+		start, err := parseTime(startTime)
+		if err != nil {
+			continue
+		}
+		end, err := parseTime(endTime)
+		if err != nil {
+			continue
+		}
 
 		// 根据模式计数和累计分钟数
-		if mode == 0 {
+		if mode == 0 { // 番茄模式
 			pomodoroCount++
 			pomodoroMinutes += duration
-			// 假设每个番茄时间为25分钟
-			tomatoHarvests += duration / 25
-		} else {
+			// 每个番茄钟增加一个番茄收成
+			tomatoHarvests++
+		} else { // 自定义模式
 			customCount++
 			customMinutes += duration
 		}
@@ -199,4 +205,22 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 // formatTimeRange 格式化时间范围为 "HH:MM~HH:MM" 格式
 func formatTimeRange(startHour, startMin, endHour, endMin int) string {
 	return fmt.Sprintf("%02d:%02d~%02d:%02d", startHour, startMin, endHour, endMin)
+}
+
+// parseTime 兼容解析多种时间格式
+func parseTime(timeStr string) (time.Time, error) {
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z07:00",
+		"2006-01-02T15:04:05",
+		"2006-01-02",
+	}
+	for _, f := range formats {
+		t, err := time.Parse(f, timeStr)
+		if err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("无法解析时间格式: %s", timeStr)
 }
