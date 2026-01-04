@@ -6,6 +6,9 @@ import (
 	"time"
 
 	"MTimer/backend/controllers/types"
+	"MTimer/backend/errors"
+	"MTimer/backend/interfaces"
+	"MTimer/backend/logger"
 	"MTimer/backend/models"
 )
 
@@ -15,15 +18,23 @@ type TodoController struct {
 	focusSessionRepo *models.FocusSessionRepository
 	dailyStatRepo    *models.DailyStatRepository
 	eventStatRepo    *models.EventStatRepository
+	txManager        interfaces.TransactionManager
 }
 
 // NewTodoController 创建一个新的TodoController
-func NewTodoController() *TodoController {
+func NewTodoController(
+	todoRepo *models.TodoRepository,
+	focusSessionRepo *models.FocusSessionRepository,
+	dailyStatRepo *models.DailyStatRepository,
+	eventStatRepo *models.EventStatRepository,
+	txManager interfaces.TransactionManager,
+) *TodoController {
 	return &TodoController{
-		todoRepo:         models.NewTodoRepository(),
-		focusSessionRepo: models.NewFocusSessionRepository(),
-		dailyStatRepo:    models.NewDailyStatRepository(),
-		eventStatRepo:    models.NewEventStatRepository(),
+		todoRepo:         todoRepo,
+		focusSessionRepo: focusSessionRepo,
+		dailyStatRepo:    dailyStatRepo,
+		eventStatRepo:    eventStatRepo,
+		txManager:        txManager,
 	}
 }
 
@@ -65,11 +76,14 @@ func (c *TodoController) GetAllTodos() ([]types.TodoItem, error) {
 
 // CreateTodo 创建一个新的待办事项
 func (c *TodoController) CreateTodo(req types.CreateTodoRequest) (types.CreateTodoResponse, error) {
+	logger.WithField("name", req.Name).Debug("创建新的待办事项")
+
 	if req.Name == "" {
+		logger.Warn("尝试创建名称为空的待办事项")
 		return types.CreateTodoResponse{
 			Success: false,
 			Message: "待办事项名称不能为空",
-		}, fmt.Errorf("待办事项名称不能为空")
+		}, errors.ErrInvalidInput
 	}
 
 	// 将字符串模式转换为整数
@@ -93,12 +107,14 @@ func (c *TodoController) CreateTodo(req types.CreateTodoRequest) (types.CreateTo
 
 	err := c.todoRepo.Create(todo)
 	if err != nil {
+		logger.WithError(err).WithField("name", req.Name).Error("创建待办事项失败")
 		return types.CreateTodoResponse{
 			Success: false,
-			Message: "创建待办事项失败: " + err.Error(),
-		}, err
+			Message: "创建待办事项失败",
+		}, errors.Wrap(errors.ErrorTypeInternal, "TODO_CREATE_FAILED", "创建待办事项失败", err)
 	}
 
+	logger.WithField("id", todo.ID).Info("待办事项创建成功")
 	return types.CreateTodoResponse{
 		Success: true,
 		Message: "创建待办事项成功",
@@ -201,82 +217,95 @@ func (c *TodoController) StartFocusSession(req types.StartFocusSessionRequest) (
 
 // CompleteFocusSession 完成一个专注会话
 func (c *TodoController) CompleteFocusSession(req types.CompleteFocusSessionRequest) (types.BasicResponse, error) {
-	// 获取会话信息以获取todo_id
-	var todoID int64
-	err := models.DB.QueryRow(`
-		SELECT todo_id FROM focus_sessions WHERE time_id = ?
-	`, req.SessionID).Scan(&todoID)
+	logger.WithFields(map[string]interface{}{
+		"session_id":        req.SessionID,
+		"break_time":        req.BreakTime,
+		"mark_as_completed": req.MarkAsCompleted,
+	}).Debug("完成专注会话")
 
-	if err != nil {
-		return types.BasicResponse{
-			Success: false,
-			Message: "获取会话信息失败: " + err.Error(),
-		}, err
-	}
+	var result types.BasicResponse
 
-	// 完成专注会话
-	err = c.focusSessionRepo.CompleteSession(req.SessionID, req.BreakTime)
-	if err != nil {
-		return types.BasicResponse{
-			Success: false,
-			Message: "完成专注会话失败: " + err.Error(),
-		}, err
-	}
+	// 使用事务确保数据一致性
+	err := c.txManager.ExecuteInTransaction(func() error {
+		// 获取会话信息以获取todo_id
+		var todoID int64
+		err := models.GetSQLDB().QueryRow(`
+			SELECT todo_id FROM focus_sessions WHERE time_id = ?
+		`, req.SessionID).Scan(&todoID)
 
-	// 更新待办事项状态为已完成
-	if req.MarkAsCompleted {
-		err = c.todoRepo.UpdateStatus(todoID, "completed")
 		if err != nil {
-			return types.BasicResponse{
-				Success: false,
-				Message: "更新待办事项状态失败: " + err.Error(),
-			}, err
-		}
-	} else {
-		// 检查是否还有其他未完成的会话
-		existingSession, err := c.focusSessionRepo.GetUnfinishedSession(todoID)
-		if err != nil {
-			return types.BasicResponse{
-				Success: false,
-				Message: "检查未完成会话失败: " + err.Error(),
-			}, err
+			logger.WithError(err).WithField("session_id", req.SessionID).Error("获取会话信息失败")
+			return errors.Wrap(errors.ErrorTypeNotFound, "SESSION_NOT_FOUND", "专注会话不存在", err)
 		}
 
-		// 如果没有其他未完成的会话，将待办事项状态更新为待处理
-		if existingSession == nil {
-			err = c.todoRepo.UpdateStatus(todoID, "pending")
+		// 完成专注会话
+		err = c.focusSessionRepo.CompleteSession(req.SessionID, req.BreakTime)
+		if err != nil {
+			logger.WithError(err).WithField("session_id", req.SessionID).Error("完成专注会话失败")
+			return err
+		}
+
+		// 更新待办事项状态
+		if req.MarkAsCompleted {
+			err = c.todoRepo.UpdateStatus(todoID, "completed")
 			if err != nil {
-				return types.BasicResponse{
-					Success: false,
-					Message: "更新待办事项状态失败: " + err.Error(),
-				}, err
+				logger.WithError(err).WithField("todo_id", todoID).Error("更新待办事项状态为完成失败")
+				return err
+			}
+		} else {
+			// 检查是否还有其他未完成的会话
+			existingSession, err := c.focusSessionRepo.GetUnfinishedSession(todoID)
+			if err != nil {
+				logger.WithError(err).WithField("todo_id", todoID).Error("检查未完成会话失败")
+				return err
+			}
+
+			// 如果没有其他未完成的会话，将待办事项状态更新为待处理
+			if existingSession == nil {
+				err = c.todoRepo.UpdateStatus(todoID, "pending")
+				if err != nil {
+					logger.WithError(err).WithField("todo_id", todoID).Error("更新待办事项状态为待处理失败")
+					return err
+				}
 			}
 		}
-	}
 
-	// 更新每日统计数据
-	today := time.Now().Format("2006-01-02")
-	err = c.dailyStatRepo.UpdateDailyStats(today)
+		// 更新每日统计数据
+		today := time.Now().Format("2006-01-02")
+		err = c.dailyStatRepo.UpdateDailyStats(today)
+		if err != nil {
+			logger.WithError(err).WithField("date", today).Error("更新每日统计数据失败")
+			return err
+		}
+
+		// 更新任务历史统计数据
+		err = c.eventStatRepo.UpdateEventStats(todoID, today)
+		if err != nil {
+			logger.WithError(err).WithFields(map[string]interface{}{
+				"todo_id": todoID,
+				"date":    today,
+			}).Error("更新任务历史统计失败")
+			return err
+		}
+
+		return nil
+	})
+
 	if err != nil {
-		return types.BasicResponse{
+		result = types.BasicResponse{
 			Success: false,
-			Message: "更新统计数据失败: " + err.Error(),
-		}, err
+			Message: "完成专注会话失败",
+		}
+		logger.WithError(err).Error("事务执行失败")
+		return result, err
 	}
 
-	// 更新任务历史统计数据
-	err = c.eventStatRepo.UpdateEventStats(todoID, today)
-	if err != nil {
-		return types.BasicResponse{
-			Success: false,
-			Message: "更新任务历史统计失败: " + err.Error(),
-		}, err
-	}
-
-	return types.BasicResponse{
+	result = types.BasicResponse{
 		Success: true,
 		Message: "专注会话完成",
-	}, nil
+	}
+	logger.WithField("session_id", req.SessionID).Info("专注会话完成成功")
+	return result, nil
 }
 
 // GetStats方法已移至StatsController

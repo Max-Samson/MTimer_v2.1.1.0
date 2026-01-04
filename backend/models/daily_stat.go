@@ -22,11 +22,15 @@ type DailyStat struct {
 }
 
 // DailyStatRepository 提供对DailyStat表的操作
-type DailyStatRepository struct{}
+type DailyStatRepository struct {
+	db Database
+}
 
 // NewDailyStatRepository 创建一个新的DailyStatRepository
-func NewDailyStatRepository() *DailyStatRepository {
-	return &DailyStatRepository{}
+func NewDailyStatRepository(db Database) *DailyStatRepository {
+	return &DailyStatRepository{
+		db: db,
+	}
 }
 
 // GetByDateRange 获取指定日期范围内的统计数据

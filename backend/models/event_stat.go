@@ -17,11 +17,15 @@ type EventStat struct {
 }
 
 // EventStatRepository 提供对EventStat表的操作
-type EventStatRepository struct{}
+type EventStatRepository struct {
+	db Database
+}
 
 // NewEventStatRepository 创建一个新的EventStatRepository
-func NewEventStatRepository() *EventStatRepository {
-	return &EventStatRepository{}
+func NewEventStatRepository(db Database) *EventStatRepository {
+	return &EventStatRepository{
+		db: db,
+	}
 }
 
 // UpdateEventStats 更新指定日期和任务的统计数据

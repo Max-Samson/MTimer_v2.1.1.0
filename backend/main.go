@@ -8,6 +8,8 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options"
 
 	"MTimer/backend/controllers"
+	"MTimer/backend/di"
+	"MTimer/backend/logger"
 	"MTimer/backend/models"
 )
 
@@ -15,6 +17,10 @@ import (
 // 主程序的main.go会处理这部分
 
 func main() {
+	// 初始化日志
+	appLogger := logger.NewDefault()
+	logger.SetDefault(appLogger)
+
 	log.Println("开始初始化后端应用...")
 
 	// 初始化数据库连接
@@ -24,8 +30,36 @@ func main() {
 	}
 	defer models.CloseDatabase()
 
-	// 初始化应用控制器
-	app := NewApp()
+	// 初始化依赖注入容器
+	container := di.New()
+
+	// 注册数据库适配器
+	container.Provide(func() di.Database {
+		return di.NewDatabaseAdapter(models.GetSQLDB())
+	})
+
+	// 创建Repository实例
+	todoRepo := models.NewTodoRepository(models.GetDB())
+	focusSessionRepo := models.NewFocusSessionRepository(models.GetDB())
+	dailyStatRepo := models.NewDailyStatRepository(models.GetDB())
+	eventStatRepo := models.NewEventStatRepository(models.GetDB())
+
+	// 注册事务管理器
+	container.Provide(func(db di.Database) di.TransactionManager {
+		return di.NewTransactionManager(db)
+	})
+
+	// 注册Repository
+	container.Provide(func() *models.TodoRepository { return todoRepo })
+	container.Provide(func() *models.FocusSessionRepository { return focusSessionRepo })
+	container.Provide(func() *models.DailyStatRepository { return dailyStatRepo })
+	container.Provide(func() *models.EventStatRepository { return eventStatRepo })
+
+	// 初始化应用
+	app, err := NewApp(container)
+	if err != nil {
+		log.Fatalf("初始化应用失败: %v", err)
+	}
 
 	// 创建应用程序
 	err = wails.Run(&options.App{
@@ -49,14 +83,20 @@ func main() {
 type App struct {
 	todoController *controllers.TodoController
 	statController *controllers.StatsController
+	aiController   *controllers.AIController
 }
 
 // NewApp creates a new App application struct
-func NewApp() *App {
+func NewApp(container *di.Container) (*App, error) {
+	// 从容器中解析依赖
+	todoController := container.MustResolve((*controllers.TodoController)(nil)).(*controllers.TodoController)
+	statController := container.MustResolve((*controllers.StatsController)(nil)).(*controllers.StatsController)
+
 	return &App{
-		todoController: controllers.NewTodoController(),
-		statController: controllers.NewStatsController(),
-	}
+		todoController: todoController,
+		statController: statController,
+		aiController:   &controllers.AIController{},
+	}, nil
 }
 
 // startup is called when the app starts

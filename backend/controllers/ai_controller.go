@@ -2,11 +2,11 @@ package controllers
 
 import (
 	"MTimer/backend/controllers/types"
+	"MTimer/backend/logger"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"regexp"
@@ -24,7 +24,7 @@ func NewAIController() *AIController {
 	// 从环境变量获取API密钥
 	apiKey := os.Getenv("DEEPSEEK_API_KEY")
 	if apiKey == "" {
-		log.Println("警告: DEEPSEEK_API_KEY环境变量未设置，使用测试模式")
+		logger.Warn("DEEPSEEK_API_KEY环境变量未设置，使用测试模式")
 	}
 
 	return &AIController{
@@ -44,12 +44,12 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	apiKey := c.apiKey
 	if req.ApiKey != "" {
 		apiKey = req.ApiKey
-		log.Println("使用请求中提供的API密钥")
+		logger.Info("使用请求中提供的API密钥")
 	}
 
 	// 检查API密钥是否为空
 	if apiKey == "" {
-		log.Println("API密钥未设置，使用模拟响应")
+		logger.Info("API密钥未设置，使用模拟响应")
 		return c.getMockResponse(req)
 	}
 
@@ -114,7 +114,7 @@ func (c *AIController) processTaskData(resp *types.DeepSeekAPIResponse) {
 
 	// 如果成功提取了任务数据，可以在这里进行额外处理
 	if len(taskData) > 0 {
-		log.Printf("成功提取任务数据，任务数量: %d", len(taskData))
+		logger.WithField("count", len(taskData)).Debug("成功提取任务数据")
 	}
 }
 
@@ -146,7 +146,7 @@ func (c *AIController) extractTaskDataFromContent(content string) []types.TaskPl
 		Tasks []types.TaskPlan `json:"tasks"`
 	}
 	if err := json.Unmarshal([]byte(jsonStr), &taskData); err != nil {
-		log.Printf("解析任务数据JSON失败: %v", err)
+		logger.WithError(err).Error("解析任务数据JSON失败")
 		return nil
 	}
 
@@ -157,7 +157,7 @@ func (c *AIController) extractTaskDataFromContent(content string) []types.TaskPl
 func (c *AIController) getMockResponse(req types.DeepSeekAPIRequest) (*types.DeepSeekAPIResponse, error) {
 	// 分析用户最后一条消息，用于日志记录
 	if len(req.Messages) > 0 {
-		log.Printf("生成模拟响应，用户消息: %s", req.Messages[len(req.Messages)-1].Content)
+		logger.WithField("user_message", req.Messages[len(req.Messages)-1].Content).Debug("生成模拟响应")
 	}
 
 	// 生成模拟内容

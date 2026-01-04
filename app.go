@@ -6,6 +6,7 @@ import (
 
 	"MTimer/backend/controllers"
 	"MTimer/backend/controllers/types"
+	"MTimer/backend/di"
 	"MTimer/backend/models"
 	"MTimer/backend/utils"
 )
@@ -41,10 +42,35 @@ func (a *App) startup(ctx context.Context) {
 		log.Fatalf("数据库初始化失败: %v", err)
 	}
 
+	// 初始化依赖注入容器和组件
+	container := di.New()
+
+	// 注册数据库适配器
+	container.Provide(func() di.Database {
+		return di.NewDatabaseAdapter(models.GetSQLDB())
+	})
+
+	// 创建Repository实例
+	todoRepo := models.NewTodoRepository(models.GetDB())
+	focusSessionRepo := models.NewFocusSessionRepository(models.GetDB())
+	dailyStatRepo := models.NewDailyStatRepository(models.GetDB())
+	eventStatRepo := models.NewEventStatRepository(models.GetDB())
+
+	// 注册事务管理器
+	container.Provide(func(db di.Database) di.TransactionManager {
+		return di.NewTransactionManager(db)
+	})
+
+	// 注册Repository
+	container.Provide(func() *models.TodoRepository { return todoRepo })
+	container.Provide(func() *models.FocusSessionRepository { return focusSessionRepo })
+	container.Provide(func() *models.DailyStatRepository { return dailyStatRepo })
+	container.Provide(func() *models.EventStatRepository { return eventStatRepo })
+
 	// 初始化控制器
-	a.todoController = controllers.NewTodoController()
-	a.statController = controllers.NewStatsController()
-	a.aiController = controllers.NewAIController()
+	a.todoController = container.MustResolve((*controllers.TodoController)(nil)).(*controllers.TodoController)
+	a.statController = container.MustResolve((*controllers.StatsController)(nil)).(*controllers.StatsController)
+	a.aiController = &controllers.AIController{}
 
 	log.Println("应用启动成功")
 }

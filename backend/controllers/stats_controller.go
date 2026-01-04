@@ -18,11 +18,15 @@ type StatsController struct {
 }
 
 // NewStatsController 创建一个新的StatsController
-func NewStatsController() *StatsController {
+func NewStatsController(
+	dailyStatRepo *models.DailyStatRepository,
+	focusSessionRepo *models.FocusSessionRepository,
+	eventStatRepo *models.EventStatRepository,
+) *StatsController {
 	return &StatsController{
-		dailyStatRepo:    models.NewDailyStatRepository(),
-		focusSessionRepo: models.NewFocusSessionRepository(),
-		eventStatRepo:    models.NewEventStatRepository(),
+		dailyStatRepo:    dailyStatRepo,
+		focusSessionRepo: focusSessionRepo,
+		eventStatRepo:    eventStatRepo,
 	}
 }
 
