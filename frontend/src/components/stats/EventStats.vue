@@ -4,11 +4,12 @@
     <div class="stats-header">
       <h3 class="section-title">事件统计</h3>
 
-      <!-- 修改刷新按钮样式，使用静态图标 -->
-      <button class="refresh-btn" @click="refreshData" :disabled="loading">
-        <i class="refresh-icon" v-if="!loading">🔄</i>
-        <span v-if="loading" class="loading-spinner-small"></span>
-        <span v-else>刷新</span>
+      <!-- 修改刷新按钮为大图标风格 -->
+      <button class="refresh-btn" @click="refreshData" :disabled="loading" title="刷新数据">
+        <n-icon v-if="!loading" :size="28">
+          <ArrowSyncCircle24Regular />
+        </n-icon>
+        <span v-else class="loading-spinner-small"></span>
       </button>
     </div>
 
@@ -99,6 +100,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed, nextTick, onBeforeUnmount, inject, watch } from 'vue';
+import { NIcon } from 'naive-ui';
+import { ArrowSyncCircle24Regular } from '@vicons/fluent';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart } from 'echarts/charts';
 import {
@@ -277,12 +280,6 @@ const updateChartsTheme = () => {
 
 // 加载数据
 const loadData = async (force: boolean = false) => {
-  // 如果已经在加载中，则跳过
-  if (loading.value) {
-    console.log('数据正在加载中，跳过此次刷新');
-    return;
-  }
-
   console.log(`开始加载事件统计数据，时间范围: ${startDate.value} - ${endDate.value}, 强制更新: ${force}`);
   loading.value = true;
   error.value = null;
@@ -776,6 +773,13 @@ const initWorkloadTrendChart = () => {
   padding: 16px;
 }
 
+.stats-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
 .section-title {
   font-size: 18px;
   font-weight: bold;
@@ -830,17 +834,20 @@ const initWorkloadTrendChart = () => {
 .refresh-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  background-color: #ffffff;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  border: none;
+  background-color: transparent;
   cursor: pointer;
   transition: all 0.2s;
+  color: #606266;
+  width: 36px;
+  height: 36px;
 }
 
 .refresh-btn:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .refresh-btn:disabled {
@@ -1066,16 +1073,12 @@ const initWorkloadTrendChart = () => {
   color: #909399;
 }
 
-:root[data-theme="dark"] .refresh-btn,
-:root[data-theme="dark"] .auto-refresh-btn {
-  background-color: #252D3C;
-  border-color: #4C5D7A;
-  color: #E5EAF3;
+:root[data-theme="dark"] .refresh-btn {
+  color: #e5eaf3;
 }
 
-:root[data-theme="dark"] .refresh-btn:hover,
-:root[data-theme="dark"] .auto-refresh-btn:hover {
-  background-color: #33415a;
+:root[data-theme="dark"] .refresh-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 .force-stop-btn {

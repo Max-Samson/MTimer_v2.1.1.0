@@ -150,7 +150,7 @@ app.mount('#app')
 
 // 启用测试数据生成器，确保统计图表有数据展示
 // 如果后端数据正常则使用真实数据，否则使用模拟数据
-TestDataGenerator.mockBackendAPI()
+// TestDataGenerator.mockBackendAPI()
 
 // 应用程序初始化存储，在mounted后执行
 const initStores = () => {

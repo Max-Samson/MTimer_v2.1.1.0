@@ -3,10 +3,12 @@
   <div class="pomodoro-stats">
     <div class="stats-header">
       <h3 class="section-title">番茄统计</h3>
-      <button class="refresh-btn" @click="refreshData" :disabled="loading">
-        <i class="refresh-icon" v-if="!loading">🔄</i>
-        <span v-if="loading" class="loading-spinner-small"></span>
-        <span v-else>刷新</span>
+      <!-- 修改刷新按钮为大图标风格 -->
+      <button class="refresh-btn" @click="refreshData" :disabled="loading" title="刷新数据">
+        <n-icon v-if="!loading" :size="28" class="refresh-icon">
+          <ArrowSyncCircle24Regular />
+        </n-icon>
+        <span v-else class="loading-spinner-small"></span>
       </button>
     </div>
 
@@ -98,6 +100,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive, computed, nextTick, onBeforeUnmount, watch } from 'vue';
+import { NIcon } from 'naive-ui';
+import { ArrowSyncCircle24Regular } from '@vicons/fluent';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart, RadarChart } from 'echarts/charts';
 import {
@@ -1166,6 +1170,14 @@ onBeforeUnmount(() => {
   color: #909399;
 }
 
+:root[data-theme="dark"] .refresh-btn {
+  color: #e5eaf3;
+}
+
+:root[data-theme="dark"] .refresh-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
 .stats-header {
   display: flex;
   justify-content: space-between;
@@ -1176,17 +1188,20 @@ onBeforeUnmount(() => {
 .refresh-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  background-color: #ffffff;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  border: none;
+  background-color: transparent;
   cursor: pointer;
   transition: all 0.2s;
+  color: #606266;
+  width: 36px;
+  height: 36px;
 }
 
 .refresh-btn:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .refresh-btn:disabled {

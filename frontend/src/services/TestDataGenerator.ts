@@ -281,9 +281,15 @@ export class TestDataGenerator {
         // 首先尝试调用原始方法
         const result = await originalGetDailySummary();
 
-        // 如果数据为空或无效，使用测试数据
-        if (!result || !result.yesterdayStat || !result.yesterdayStat.date || result.weekTrend.length === 0) {
-          console.log('使用生成的昨日小结测试数据');
+        // 仅在完全没有数据时才考虑使用模拟数据
+        // 改进判断逻辑：如果返回了有效的yesterdayStat（即使数据为0）或者weekTrend不为空，则认为后端数据正常
+        const hasRealData = result && (
+          (result.yesterdayStat && result.yesterdayStat.date !== '') || 
+          (result.weekTrend && result.weekTrend.length > 0)
+        );
+
+        if (!hasRealData) {
+          console.log('后端返回数据为空，使用生成的昨日小结测试数据');
           return this.generateDailySummary();
         }
 
@@ -299,9 +305,11 @@ export class TestDataGenerator {
         // 首先尝试调用原始方法
         const result = await originalGetEventStats(startDate, endDate);
 
-        // 如果数据为空或无效，使用测试数据
-        if (!result || result.totalEvents === 0 || result.trendData.length === 0) {
-          console.log('使用生成的事件统计测试数据');
+        // 如果数据不为空，则认为后端数据正常
+        const hasRealData = result && (result.totalEvents > 0 || (result.trendData && result.trendData.length > 0));
+
+        if (!hasRealData) {
+          console.log('后端返回数据为空，使用生成的事件统计测试数据');
           return this.generateEventStats(startDate, endDate);
         }
 
@@ -317,9 +325,11 @@ export class TestDataGenerator {
         // 首先尝试调用原始方法
         const result = await originalGetPomodoroStats(startDate, endDate);
 
-        // 如果数据为空或无效，使用测试数据
-        if (!result || result.totalPomodoros === 0 || result.trendData.length === 0 || !result.bestDay.date) {
-          console.log('使用生成的番茄统计测试数据');
+        // 如果数据不为空，则认为后端数据正常
+        const hasRealData = result && (result.totalPomodoros > 0 || (result.trendData && result.trendData.length > 0));
+
+        if (!hasRealData) {
+          console.log('后端返回数据为空，使用生成的番茄统计测试数据');
           return this.generatePomodoroStats(startDate, endDate);
         }
 

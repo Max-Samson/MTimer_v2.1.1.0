@@ -3,11 +3,12 @@
   <div class="daily-summary">
     <div class="stats-header">
       <div class="section-header">昨日小结</div>
-      <!-- 添加静态刷新按钮 -->
-      <button class="refresh-btn" @click="refreshData" :disabled="loading">
-        <i class="refresh-icon" v-if="!loading">🔄</i>
-        <span v-if="loading" class="loading-spinner-small"></span>
-        <span v-else>刷新</span>
+      <!-- 修改刷新按钮为大图标风格 -->
+      <button class="refresh-btn" @click="refreshData" :disabled="loading" title="刷新数据">
+        <n-icon v-if="!loading" :size="28" class="refresh-icon">
+          <ArrowSyncCircle24Regular />
+        </n-icon>
+        <span v-else class="loading-spinner-small"></span>
       </button>
     </div>
 
@@ -61,6 +62,7 @@
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import { NIcon, NSpin, NEmpty, NButton } from 'naive-ui';
 import { Timer, CheckmarkDone, TimeOutline } from '@vicons/ionicons5';
+import { ArrowSyncCircle24Regular } from '@vicons/fluent';
 import WeekTrendChart from './WeekTrendChart.vue';
 import dbService from '../../services/DatabaseService';
 import type { DailyTrendData } from '../../services/DatabaseService';
@@ -347,17 +349,20 @@ onBeforeUnmount(() => {
 .refresh-btn {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-  background-color: #ffffff;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  border: none;
+  background-color: transparent;
   cursor: pointer;
   transition: all 0.2s;
+  color: #606266;
+  width: 36px;
+  height: 36px;
 }
 
 .refresh-btn:hover {
-  background-color: #f0f0f0;
+  background-color: rgba(0, 0, 0, 0.05);
 }
 
 .refresh-btn:disabled {
@@ -391,9 +396,11 @@ onBeforeUnmount(() => {
 }
 
 :root[data-theme="dark"] .refresh-btn {
-  background-color: #252d3c;
-  border-color: #4c5d7a;
   color: #e5eaf3;
+}
+
+:root[data-theme="dark"] .refresh-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 :root[data-theme="dark"] .loading-spinner-small {
