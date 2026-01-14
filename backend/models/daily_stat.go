@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -78,6 +79,8 @@ func (r *DailyStatRepository) GetByDateRange(startDate, endDate string) ([]Daily
 // UpdateDailyStats 根据今天的专注会话更新每日统计数据
 // 应该在每次专注会话结束时调用
 func (r *DailyStatRepository) UpdateDailyStats(date string) error {
+	log.Printf("[DailyStat] 开始更新日期 %s 的统计数据", date)
+
 	// 获取指定日期的所有专注会话
 	rows, err := r.db.Query(`
 		SELECT
@@ -87,6 +90,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	`, date)
 
 	if err != nil {
+		log.Printf("[DailyStat] 查询专注会话失败: %v", err)
 		return err
 	}
 	defer rows.Close()
@@ -95,6 +99,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	var pomodoroMinutes, customMinutes, totalFocusMinutes, totalBreakMinutes, tomatoHarvests int
 	var timeRanges []string
 
+	sessionCount := 0
 	for rows.Next() {
 		var startTime, endTime string
 		var breakTime, duration, mode int
@@ -134,7 +139,11 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		endHour, endMin := end.Hour(), end.Minute()
 		timeRange := formatTimeRange(startHour, startMin, endHour, endMin)
 		timeRanges = append(timeRanges, timeRange)
+
+		sessionCount++
 	}
+
+	log.Printf("[DailyStat] 找到 %d 个完成的专注会话", sessionCount)
 
 	// 转换时间段为JSON
 	timeRangesJSON, err := json.Marshal(timeRanges)
@@ -150,6 +159,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 	}
 
 	if count > 0 {
+		log.Printf("[DailyStat] 更新现有记录, 日期: %s", date)
 		// 更新现有记录
 		_, err = r.db.Exec(`
 			UPDATE daily_stats
@@ -177,6 +187,7 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 			date,
 		)
 	} else {
+		log.Printf("[DailyStat] 插入新记录, 日期: %s", date)
 		// 插入新记录
 		_, err = r.db.Exec(`
 			INSERT INTO daily_stats (
@@ -198,6 +209,9 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 			string(timeRangesJSON),
 		)
 	}
+
+	log.Printf("[DailyStat] 更新完成 - 番茄:%d, 自定义:%d, 总时长:%d分钟",
+		pomodoroCount, customCount, totalFocusMinutes)
 
 	return err
 }

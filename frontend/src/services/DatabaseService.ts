@@ -170,7 +170,7 @@ class DatabaseService {
 
       console.log('[DatabaseService] 开始更新后端统计数据...');
       const appAny = App as any;
-      await appAny.UpdateStats();
+      await appAny.UpdateStats('');  // 传递空字符串作为date参数
       console.log('[DatabaseService] 统计数据更新成功');
       return true;
     } catch (error) {

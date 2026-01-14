@@ -51,3 +51,45 @@ type TaskResponse struct {
 	Content  string     `json:"content"`
 	TaskData []TaskPlan `json:"taskData,omitempty"`
 }
+
+// DailyInsightResponse 每日洞察响应
+type DailyInsightResponse struct {
+	Date          string   `json:"date"`
+	Summary       string   `json:"summary"`
+	Score         int      `json:"score"`
+	Highlights    []string `json:"highlights"`
+	Improvements  []string `json:"improvements"`
+	RiskAlerts    []string `json:"risk_alerts"`
+	NextDayTips   []string `json:"next_day_tips"`
+}
+
+// WeeklyInsightResponse 周洞察响应
+type WeeklyInsightResponse struct {
+	StartDate    string   `json:"start_date"`
+	EndDate      string   `json:"end_date"`
+	Summary      string   `json:"summary"`
+	TotalMinutes int      `json:"total_minutes"`
+	AvgMinutes   int      `json:"avg_minutes"`
+	BestDay      string   `json:"best_day"`
+	Achievements []string `json:"achievements"`
+	Suggestions  []string `json:"suggestions"`
+}
+
+// BehaviorFeatureResponse 行为特征响应
+type BehaviorFeatureResponse struct {
+	Date               string   `json:"date"`
+	TotalFocusMinutes  int      `json:"total_focus_minutes"`
+	PomodoroRatio      float64  `json:"pomodoro_ratio"`
+	SessionCount       int      `json:"session_count"`
+	AvgSessionLength   float64  `json:"avg_session_length"`
+	FirstFocusTime     string   `json:"first_focus_time"`
+	LastFocusTime      string   `json:"last_focus_time"`
+	PeakHours          []string `json:"peak_hours"`
+	TaskDiversity      int      `json:"task_diversity"`
+	CompletedTasks     int      `json:"completed_tasks"`
+	BreakRatio         float64  `json:"break_ratio"`
+	ComparedToAvg      string   `json:"compared_to_avg"`
+	ComparedToAvgRatio float64  `json:"compared_to_avg_ratio"`
+	StreakDays         int      `json:"streak_days"`
+	BestHour           string   `json:"best_hour"`
+}

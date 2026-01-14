@@ -13,10 +13,11 @@ import (
 
 // App struct
 type App struct {
-	ctx            context.Context
-	todoController *controllers.TodoController
-	statController *controllers.StatsController
-	aiController   *controllers.AIController
+	ctx                context.Context
+	todoController     *controllers.TodoController
+	statController     *controllers.StatsController
+	aiController       *controllers.AIController
+	aiCopilotController *controllers.AICopilotController
 }
 
 // NewApp creates a new App application struct
@@ -79,6 +80,7 @@ func (a *App) startup(ctx context.Context) {
 		eventStatRepo,
 	)
 	a.aiController = &controllers.AIController{}
+	a.aiCopilotController = controllers.NewAICopilotController(models.GetDB())
 
 	log.Println("应用启动成功")
 }
@@ -161,7 +163,6 @@ func (a *App) GetStats(req types.GetStatsRequest) ([]*types.StatResponse, error)
 }
 
 func (a *App) UpdateStats(date string) (types.BasicResponse, error) {
-	log.Printf("手动更新统计数据, 日期: %s", date)
 	return a.statController.UpdateStats(date)
 }
 
@@ -193,4 +194,20 @@ func (a *App) GetPomodoroStats(req types.GetStatsRequest) (*types.PomodoroStatsR
 func (a *App) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.DeepSeekAPIResponse, error) {
 	log.Printf("调用DeepSeek API, 消息数量: %d", len(req.Messages))
 	return a.aiController.CallDeepSeekAPI(req)
+}
+
+// AI Copilot 相关API - 提供 AI 需要的行为特征数据
+
+// GetBehaviorFeatures 获取行为特征（JSON 格式）
+// 返回结构化的行为特征数据，可直接用于 AI 分析
+func (a *App) GetBehaviorFeatures(date string) (*types.BehaviorFeatureResponse, error) {
+	log.Printf("获取行为特征, 日期: %s", date)
+	return a.aiCopilotController.GetBehaviorFeatures(date)
+}
+
+// ExportForAI 导出 AI 友好的文本格式
+// 返回易于 AI 理解的文本报告，可直接作为 AI Prompt 的一部分
+func (a *App) ExportForAI(date string) (string, error) {
+	log.Printf("导出 AI 格式数据, 日期: %s", date)
+	return a.aiCopilotController.ExportForAI(date)
 }

@@ -18,8 +18,16 @@ export function DeleteTodo(arg1) {
   return window['go']['main']['App']['DeleteTodo'](arg1);
 }
 
+export function ExportForAI(arg1) {
+  return window['go']['main']['App']['ExportForAI'](arg1);
+}
+
 export function GetAllTodos() {
   return window['go']['main']['App']['GetAllTodos']();
+}
+
+export function GetBehaviorFeatures(arg1) {
+  return window['go']['main']['App']['GetBehaviorFeatures'](arg1);
 }
 
 export function GetDailySummary() {

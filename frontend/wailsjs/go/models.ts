@@ -14,6 +14,46 @@ export namespace types {
 	        this.message = source["message"];
 	    }
 	}
+	export class BehaviorFeatureResponse {
+	    date: string;
+	    total_focus_minutes: number;
+	    pomodoro_ratio: number;
+	    session_count: number;
+	    avg_session_length: number;
+	    first_focus_time: string;
+	    last_focus_time: string;
+	    peak_hours: string[];
+	    task_diversity: number;
+	    completed_tasks: number;
+	    break_ratio: number;
+	    compared_to_avg: string;
+	    compared_to_avg_ratio: number;
+	    streak_days: number;
+	    best_hour: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new BehaviorFeatureResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.date = source["date"];
+	        this.total_focus_minutes = source["total_focus_minutes"];
+	        this.pomodoro_ratio = source["pomodoro_ratio"];
+	        this.session_count = source["session_count"];
+	        this.avg_session_length = source["avg_session_length"];
+	        this.first_focus_time = source["first_focus_time"];
+	        this.last_focus_time = source["last_focus_time"];
+	        this.peak_hours = source["peak_hours"];
+	        this.task_diversity = source["task_diversity"];
+	        this.completed_tasks = source["completed_tasks"];
+	        this.break_ratio = source["break_ratio"];
+	        this.compared_to_avg = source["compared_to_avg"];
+	        this.compared_to_avg_ratio = source["compared_to_avg_ratio"];
+	        this.streak_days = source["streak_days"];
+	        this.best_hour = source["best_hour"];
+	    }
+	}
 	export class CompleteFocusSessionRequest {
 	    session_id: number;
 	    break_time: number;

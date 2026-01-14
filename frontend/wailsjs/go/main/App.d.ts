@@ -10,7 +10,11 @@ export function CreateTodo(arg1:types.CreateTodoRequest):Promise<types.CreateTod
 
 export function DeleteTodo(arg1:number):Promise<types.BasicResponse>;
 
+export function ExportForAI(arg1:string):Promise<string>;
+
 export function GetAllTodos():Promise<Array<types.TodoItem>>;
+
+export function GetBehaviorFeatures(arg1:string):Promise<types.BehaviorFeatureResponse>;
 
 export function GetDailySummary():Promise<types.DailySummaryResponse>;
 

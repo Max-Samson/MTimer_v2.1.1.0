@@ -78,18 +78,24 @@ func (c *StatsController) GetStats(req types.GetStatsRequest) ([]*types.StatResp
 // UpdateStats 手动更新指定日期的统计数据
 func (c *StatsController) UpdateStats(date string) (types.BasicResponse, error) {
 	// 如果未提供日期，使用今天的日期
+	displayDate := date // 用于日志显示
 	if date == "" {
 		date = time.Now().Format("2006-01-02")
+		displayDate = date + " (默认今天)"
 	}
+
+	log.Printf("开始更新统计数据, 日期: %s", displayDate)
 
 	err := c.dailyStatRepo.UpdateDailyStats(date)
 	if err != nil {
+		log.Printf("更新统计数据失败: %v", err)
 		return types.BasicResponse{
 			Success: false,
 			Message: "更新统计数据失败: " + err.Error(),
 		}, err
 	}
 
+	log.Printf("统计数据更新成功, 日期: %s", date)
 	return types.BasicResponse{
 		Success: true,
 		Message: "统计数据更新成功",
