@@ -1,206 +1,107 @@
 <script setup lang="ts">
-import { h, ref, inject, nextTick, onMounted, onUnmounted, computed, provide } from 'vue'
-import { NLayout, NLayoutHeader, NLayoutContent, NSpace, NButton, NIcon, darkTheme, NTooltip, NDrawer, NDrawerContent, NTabPane, NTabs, NDropdown } from 'naive-ui'
-import { RouterView, useRouter } from 'vue-router'
+import { ref, inject, nextTick, onMounted, onUnmounted, computed, provide } from 'vue'
+import { NLayout, NLayoutHeader, NSpace, NButton, NIcon, NTooltip, NDrawer, NDrawerContent, NTabs, NTabPane, NDropdown } from 'naive-ui'
 import TomatoTimer from '../components/TomatoTimer.vue'
 import TodoList from '../components/TodoList.vue'
-import Navigation from '../components/Navigation.vue'
 import SettingsView from '../views/SettingsView.vue'
 import StatisticsView from '../views/StatisticsView.vue'
 import AIAssistantView from '../views/AIAssistantView.vue'
 import MusicPlayer from '../components/MusicPlayer.vue'
 import MiniMusicController from '../components/MiniMusicController.vue'
 import PomodoroInfoModal from '../components/PomodoroInfoModal.vue'
-import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, CheckmarkFilled, Task, Rocket, Help } from '@vicons/carbon'
-import { useSettingsStore, useTimerStore, useTodoStore } from '../stores'
+import { Moon, Sunny, Settings, Music, Maximize, Minimize, ChevronDown, ChartLine, Task, Rocket, Help } from '@vicons/carbon'
+import { useTimerStore, useTodoStore } from '../stores'
 import { storeToRefs } from 'pinia'
 import mitt, { Emitter } from 'mitt'
 
-// 定义事件类型
+// 事件总线
 type Events = {
   'show-pomodoro-info': void;
   [key: string]: any;
 }
 
-// 创建类型化的事件总线
 const emitter: Emitter<Events> = mitt()
-// 提供事件总线给子组件
 provide('emitter', emitter)
 
-// 监听事件
 emitter.on('show-pomodoro-info', () => {
   showPomodoroInfo.value = true
 })
 
-// 获取router实例
-const router = useRouter()
-
-// 从App.vue注入主题状态和切换方法
+// 主题相关
 const theme = inject('theme') as any
 const toggleTheme = inject('toggleTheme') as () => void
+
+// 状态管理
 const showSettings = ref(false)
 const showSoundSettings = ref(false)
 const isFullscreen = ref(false)
-const settingsStore = useSettingsStore()
+const showPomodoroInfo = ref(false)
+const activeTab = ref('todo')
+
+// Stores
 const timerStore = useTimerStore()
 const todoStore = useTodoStore()
-
-// 新增：显示番茄工作法介绍弹窗的状态
-const showPomodoroInfo = ref(false)
-
-// 使用storeToRefs保持响应性
 const { currentMode } = storeToRefs(timerStore)
-
-// 功能区域切换
-const activeTab = ref('todo')
-const tabs = [
-    {
-        name: 'todo',
-        label: '待办事项',
-        icon: () => h(Task),
-    },
-    {
-        name: 'stats',
-        label: '数据统计',
-        icon: () => h(ChartLine),
-    },
-    {
-        name: 'ai',
-        label: 'AI助手',
-        icon: () => h(Rocket),
-    }
-]
 
 // 模式选项
 const modeOptions = [
-    {
-        label: '番茄工作法专注模式',
-        key: 'pomodoro'
-    },
-    {
-        label: '自定义专注模式',
-        key: 'custom'
-    }
+    { label: '番茄工作法专注模式', key: 'pomodoro' },
+    { label: '自定义专注模式', key: 'custom' }
 ]
 
-// 标签页切换前的处理
+// 标签页切换处理
 const handleTabChange = (tabName: string) => {
-    // 获取当前正在进行中的任务及计时器状态
-    const currentTaskId = todoStore.currentTodo?.id;
-    const isTimerRunning = timerStore.isRunning;
+    const currentTaskId = todoStore.currentTodo?.id
+    const isTimerRunning = timerStore.isRunning
 
-    console.log(`切换标签页到: ${tabName}, 当前任务ID: ${currentTaskId}, 计时器运行状态: ${isTimerRunning}`);
-
-    // 从任何标签页切换时，如果有任务正在进行中，确保保持其状态
     if (currentTaskId) {
-        console.log('标签页切换，保持当前任务进行中状态');
+        activeTab.value = tabName
 
-        // 设置新的标签页
-        activeTab.value = tabName;
+        const currentTodo = todoStore.currentTodo
+        const currentTime = timerStore.time
+        const initialTime = timerStore.initialTime
+        const currentMode = timerStore.currentMode
+        const isBreak = timerStore.isBreak
 
-        // 记录当前任务的重要状态
-        const currentTodo = todoStore.currentTodo;
-        const currentTime = timerStore.time;
-        const initialTime = timerStore.initialTime;
-        const currentMode = timerStore.currentMode;
-        const isBreak = timerStore.isBreak;
-
-        // 切换标签页后，确保待办事项不会被刷新
         nextTick(() => {
-            // 确保正在进行中的任务状态不会被重置
             if (currentTodo) {
-                todoStore.setCurrentTodo(currentTodo.id);
-
-                // 显式设置任务状态为进行中
-                const todoItem = todoStore.todos.find(t => t.id === currentTodo.id);
+                todoStore.setCurrentTodo(currentTodo.id)
+                
+                const todoItem = todoStore.todos.find(t => t.id === currentTodo.id)
                 if (todoItem) {
-                    todoStore.setTodoStatus(todoItem.id, 'inProgress');
+                    todoStore.setTodoStatus(todoItem.id, 'inProgress')
                 }
 
-                // 确保计时器状态不会被重置
                 if (isTimerRunning) {
-                    // 恢复计时器状态
                     timerStore.restoreTimerState({
                         time: currentTime,
                         initialTime: initialTime,
                         isRunning: true,
                         isBreak: isBreak,
                         currentMode: currentMode
-                    });
-
-                    console.log('已恢复计时器状态:', {
-                        time: currentTime,
-                        isRunning: true,
-                        currentMode: currentMode,
-                        isBreak: isBreak
-                    });
+                    })
                 }
             }
-        });
+        })
     } else {
-        // 普通标签页切换
-        activeTab.value = tabName;
+        activeTab.value = tabName
     }
-}
-
-const toggleSettings = () => {
-    showSettings.value = !showSettings.value
-}
-
-const toggleSoundSettings = () => {
-    showSoundSettings.value = !showSoundSettings.value
-}
-
-const toggleFullscreen = () => {
-    // 切换全屏状态
-    isFullscreen.value = !isFullscreen.value
-
-    // 延迟短暂时间，确保DOM更新后再执行其他操作
-    setTimeout(() => {
-        // 如果需要，这里可以添加全屏/退出全屏后的其他操作
-        // 但不要重置或修改timerStore中的状态
-    }, 100)
 }
 
 // 切换计时器模式
 const changeTimerMode = (key: string) => {
     if (key === 'pomodoro' || key === 'custom') {
-        // 使用新的switchTimerMode方法切换模式
         timerStore.switchTimerMode(key as 'pomodoro' | 'custom')
     }
 }
 
-// 直接进入设置页面
-const navigateToSettings = () => {
-  // 关闭设置抽屉
-  showSettings.value = false;
-
-  // 导航到设置页面
-  router.push('/settings');
-};
-
-// 窗口宽度响应式变量
+// 响应式窗口宽度
 const windowWidth = ref(window.innerWidth)
+const handleResize = () => windowWidth.value = window.innerWidth
+const drawerWidth = computed(() => windowWidth.value > 1200 ? 1200 : '100%')
 
-// 监听窗口大小变化
-const handleResize = () => {
-    windowWidth.value = window.innerWidth
-}
-
-// 根据窗口宽度计算抽屉宽度
-const drawerWidth = computed(() => {
-    return windowWidth.value > 1200 ? 1200 : '100%'
-})
-
-// 组件挂载时添加窗口大小变化监听
-onMounted(() => {
-    window.addEventListener('resize', handleResize)
-})
-
-// 组件卸载时移除监听
-onUnmounted(() => {
-    window.removeEventListener('resize', handleResize)
-})
+onMounted(() => window.addEventListener('resize', handleResize))
+onUnmounted(() => window.removeEventListener('resize', handleResize))
 </script>
 
 <template>
@@ -211,10 +112,8 @@ onUnmounted(() => {
                     <div class="left-controls">
                         <n-tooltip trigger="hover" placement="bottom">
                             <template #trigger>
-                                <n-button circle @click="toggleFullscreen" class="fullscreen-btn">
-                                    <n-icon>
-                                        <Maximize />
-                                    </n-icon>
+                                <n-button circle @click="isFullscreen = true" class="fullscreen-btn">
+                                    <n-icon><Maximize /></n-icon>
                                 </n-button>
                             </template>
                             <span>全屏模式</span>
@@ -227,8 +126,7 @@ onUnmounted(() => {
                     </div>
 
                     <div class="right-controls">
-                        <n-dropdown trigger="hover" :options="modeOptions" @select="changeTimerMode"
-                            :value="currentMode">
+                        <n-dropdown trigger="hover" :options="modeOptions" @select="changeTimerMode" :value="currentMode">
                             <n-button class="mode-switch-btn">
                                 <span>{{ currentMode === 'pomodoro' ? '番茄工作法专注模式' : '自定义专注模式' }}</span>
                                 <n-icon style="margin-left: 5px">
@@ -238,13 +136,10 @@ onUnmounted(() => {
                         </n-dropdown>
 
                         <n-space>
-                            <!-- 新增：番茄工作法介绍按钮 -->
                             <n-tooltip trigger="hover" placement="bottom">
                                 <template #trigger>
                                     <n-button circle @click="showPomodoroInfo = true" class="pomodoro-info-btn">
-                                        <n-icon>
-                                            <Help />
-                                        </n-icon>
+                                        <n-icon><Help /></n-icon>
                                     </n-button>
                                 </template>
                                 <span>番茄工作法介绍</span>
@@ -264,10 +159,8 @@ onUnmounted(() => {
 
                             <n-tooltip trigger="hover" placement="bottom">
                                 <template #trigger>
-                                    <n-button circle @click="toggleSoundSettings" class="sound-btn">
-                                        <n-icon>
-                                            <Music />
-                                        </n-icon>
+                                    <n-button circle @click="showSoundSettings = !showSoundSettings" class="sound-btn">
+                                        <n-icon><Music /></n-icon>
                                     </n-button>
                                 </template>
                                 <span>音乐设置</span>
@@ -275,10 +168,8 @@ onUnmounted(() => {
 
                             <n-tooltip trigger="hover" placement="bottom">
                                 <template #trigger>
-                                    <n-button circle @click="toggleSettings" class="settings-btn">
-                                        <n-icon>
-                                            <Settings />
-                                        </n-icon>
+                                    <n-button circle @click="showSettings = !showSettings" class="settings-btn">
+                                        <n-icon><Settings /></n-icon>
                                     </n-button>
                                 </template>
                                 <span>设置</span>
@@ -288,25 +179,19 @@ onUnmounted(() => {
                 </div>
             </transition>
 
-            <!-- 全屏模式下的返回按钮 -->
             <transition name="fade">
                 <div class="fullscreen-controls" v-if="isFullscreen">
-                    <n-button circle @click="toggleFullscreen" class="exit-fullscreen-btn">
-                        <n-icon>
-                            <Minimize />
-                        </n-icon>
+                    <n-button circle @click="isFullscreen = false" class="exit-fullscreen-btn">
+                        <n-icon><Minimize /></n-icon>
                     </n-button>
                 </div>
             </transition>
 
-            <!-- 主内容区 -->
             <div class="main-content" :class="{ 'fullscreen-content': isFullscreen }">
-                <!-- 使用单一实例的TomatoTimer组件，通过类名控制样式，避免重新渲染 -->
                 <div :class="{ 'centered-timer': isFullscreen, 'left-column': !isFullscreen }">
                     <tomato-timer />
                 </div>
 
-                <!-- 正常模式显示右侧列 -->
                 <div v-if="!isFullscreen" class="right-column">
                     <n-tabs v-model:value="activeTab" type="line" animated @update:value="handleTabChange">
                         <n-tab-pane name="todo">
@@ -354,27 +239,21 @@ onUnmounted(() => {
             </n-drawer-content>
         </n-drawer>
 
-        <!-- 音乐设置抽屉 -->
         <n-drawer v-model:show="showSoundSettings" :width="400" placement="right">
             <n-drawer-content title="音乐设置" closable>
-                <div class="sound-settings">
-                    <!-- 音乐播放器组件 -->
-                    <music-player />
-                </div>
+                <music-player />
             </n-drawer-content>
         </n-drawer>
 
-        <!-- 新增：番茄工作法介绍弹窗 -->
         <pomodoro-info-modal v-model:show="showPomodoroInfo" />
     </n-layout>
-    <!-- 迷你音乐控制器 -->
+    
     <mini-music-controller />
 </template>
 
 <style scoped>
 .header {
-    height: auto;
-    min-height: 100vh;
+    height: 100vh;
     display: flex;
     flex-direction: column;
     padding: 0;
@@ -510,7 +389,7 @@ onUnmounted(() => {
     align-items: flex-start;
     padding: 20px;
     height: calc(100vh - 70px);
-    overflow: auto;
+    overflow: hidden;
 }
 
 .fullscreen-content {
@@ -568,26 +447,6 @@ onUnmounted(() => {
     margin-left: 8px;
 }
 
-.stats-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 300px;
-    color: #666;
-    transition: color var(--transition-time) ease;
-}
-
-:root[data-theme="dark"] .stats-container {
-    color: #aaa;
-}
-
-.sound-settings {
-    padding: 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
 
 .tab-item {
     display: flex;
@@ -630,22 +489,6 @@ onUnmounted(() => {
 :root[data-theme="dark"] .right-column :deep(.n-tabs-nav__bar) {
     background-color: var(--secondary-dark) !important;
     box-shadow: 0 0 10px rgba(50, 205, 50, 0.5);
-}
-
-@media (max-width: 992px) {
-    .two-column-layout {
-        flex-direction: column;
-        gap: 30px;
-    }
-
-    .left-column {
-        flex: 0 0 auto;
-        width: 100%;
-    }
-
-    .right-column {
-        width: 100%;
-    }
 }
 
 @keyframes fadeIn {
@@ -721,24 +564,7 @@ onUnmounted(() => {
     }
 }
 
-/* 抽屉样式覆盖 */
-:deep(.n-drawer-content-wrapper) {
-    width: 100%;
-    max-width: 100%;
-}
-
-:deep(.n-drawer-content) {
-    width: 100%;
-    max-width: 100%;
-}
-
-:deep(.settings-view),
-:deep(.settings-card) {
-    width: 100%;
-    max-width: 100%;
-}
-
-/* 添加番茄工作法按钮的样式 */
+/* 番茄工作法按钮样式 */
 .pomodoro-info-btn {
     transition: all 0.3s ease;
     position: relative;
