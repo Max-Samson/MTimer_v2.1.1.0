@@ -53,51 +53,30 @@ class AIAssistantServiceClass {
       this.chatHistory.value = [];
     }
 
-    try {
-      // 尝试初始化settingsStore
-      this.settingsStore = useSettingsStore();
-      console.log('成功初始化settingsStore');
-    } catch (error) {
-      console.warn('无法初始化settingsStore，将使用默认配置:', error);
-    }
-
     console.log('AI助手服务初始化完成，聊天历史记录条数:', this.chatHistory.value.length);
+  }
+
+  private getSettingsStore() {
+    if (!this.settingsStore) {
+      try {
+        this.settingsStore = useSettingsStore();
+      } catch (error) {
+        console.warn('无法获取settingsStore:', error);
+      }
+    }
+    return this.settingsStore;
   }
 
   // 获取API密钥
   getApiKey(): string {
-    // 首先直接从localStorage获取，确保最新值
     const settings = localStorage.getItem('aiSettings');
     if (settings) {
       try {
         const parsed = JSON.parse(settings);
-        if (parsed && parsed.apiKey) {
-          console.log('从localStorage获取API密钥成功');
-          return parsed.apiKey;
-        }
-      } catch (e) {
-        console.error('解析localStorage中的apiSettings失败:', e);
-      }
+        if (parsed && parsed.apiKey) return parsed.apiKey;
+      } catch (e) {}
     }
-
-    // 其次从settingsStore获取
-    if (this.settingsStore) {
-      const storeKey = this.settingsStore.aiSettings.apiKey;
-      if (storeKey) {
-        console.log('从settingsStore获取API密钥成功');
-        return storeKey;
-      }
-    }
-
-    // 最后尝试从环境变量获取
-    const envKey = import.meta.env.VITE_DEEPSEEK_API_KEY || '';
-    if (envKey) {
-      console.log('从环境变量获取API密钥成功');
-      return envKey;
-    }
-
-    console.warn('未能找到有效的API密钥');
-    return '';
+    return this.getSettingsStore()?.aiSettings.apiKey || '';
   }
 
   // 设置API密钥（通过settingsStore和localStorage）
@@ -116,8 +95,9 @@ class AIAssistantServiceClass {
     }
 
     // 同时保存到settingsStore
-    if (this.settingsStore) {
-      this.settingsStore.updateAISettings({
+    const store = this.getSettingsStore();
+    if (store) {
+      store.updateAISettings({
         apiKey: apiKey
       });
       console.log('API密钥已保存到settingsStore');
@@ -128,11 +108,26 @@ class AIAssistantServiceClass {
 
   // 获取AI模型
   getAiModel(): string {
-    if (this.settingsStore) {
-      return this.settingsStore.aiSettings.model;
+    const settings = localStorage.getItem('aiSettings');
+    if (settings) {
+      try {
+        const parsed = JSON.parse(settings);
+        if (parsed && parsed.model) return parsed.model;
+      } catch (e) {}
     }
+    return this.getSettingsStore()?.aiSettings.model || 'deepseek-chat';
+  }
 
-    return 'deepseek'; // 默认使用DeepSeek模型
+  // 获取AI Base URL
+  getAiBaseUrl(): string {
+    const settings = localStorage.getItem('aiSettings');
+    if (settings) {
+      try {
+        const parsed = JSON.parse(settings);
+        if (parsed && parsed.baseUrl) return parsed.baseUrl;
+      } catch (e) {}
+    }
+    return this.getSettingsStore()?.aiSettings.baseUrl || 'https://api.deepseek.com/v1';
   }
 
   // 获取聊天历史
@@ -158,9 +153,10 @@ class AIAssistantServiceClass {
 
   // 发送消息到AI服务
   async sendMessage(message: string, image?: string): Promise<void> {
-    if (message.trim() === '' && !image && this.isLoading.value) return;
+    const isMessageEmpty = !message || message.trim() === '';
+    if ((isMessageEmpty && !image) || this.isLoading.value) return;
 
-    console.log('开始处理发送消息:', message.substring(0, 20) + '...');
+    console.log('开始处理发送消息:', message ? message.substring(0, 20) + '...' : '[图片]');
     console.log('当前聊天历史记录长度:', this.chatHistory.value.length);
 
     // 设置加载状态
@@ -260,56 +256,54 @@ class AIAssistantServiceClass {
 
     switch (this.currentChatMode.value) {
       case 'task':
-        systemPrompt = `你是一个专业的番茄工作法专注时间管理助手。当用户描述他们的任务时，请按以下要求帮助规划：
-1. 解析用户的任务请求
-2. 生成合理的番茄工作法时间安排
-3. 返回友好的文字说明和结构化的任务数据
+        systemPrompt = `你是一个顶级的时间管理专家和高效能教练，专门擅长运用番茄工作法（Pomodoro Technique）和深度工作（Deep Work）理论。
+你的目标是帮助用户将模糊的任务描述转化为结构化、可执行的专注计划。
 
-请遵循以下响应格式：
-- 首先提供自然语言解释，分析用户需求并解释你的安排
-- 然后提供一个JSON代码块，包含任务数据
+### 核心原则：
+1. **科学分配**：对于需要高度认知的任务（如编程、写作），推荐 45-90 分钟的深度工作（deep_work）；对于常规任务，推荐 25 分钟番茄钟（pomodoro）。
+2. **劳逸结合**：必须包含合理的休息时间。
+3. **任务分解**：如果用户描述的任务过大，请尝试在建议中将其拆分为子任务。
 
-JSON格式示例：
+### 响应规范：
+- **分析建议**：先以专业、鼓励的口吻分析用户的任务，解释你为何这样安排。
+- **结构化数据**：必须在最后提供一个符合以下 JSON 格式的代码块，用于系统自动创建任务。
+
+### JSON 格式：
 \`\`\`json
 {
   "tasks": [
     {
-      "name": "英语学习",
-      "mode": "pomodoro",
-      "focusDuration": 25,
-      "breakDuration": 5
-    },
-    {
-      "name": "论文写作",
-      "mode": "deep_work",
-      "focusDuration": 45,
-      "breakDuration": 10
+      "name": "任务名称",
+      "mode": "pomodoro | deep_work | short_break | long_break",
+      "focusDuration": 专注分钟数,
+      "breakDuration": 休息分钟数
     }
   ]
 }
 \`\`\`
 
-请注意：
-- pomodoro: 标准番茄工作法（通常25分钟专注+5分钟休息）
-- deep_work: 深度工作（通常45-90分钟专注+10-15分钟休息）
-- short_break: 短休息（5分钟）
-- long_break: 长休息（15-30分钟）
-
-请根据任务性质选择合适的模式，并确保JSON格式正确。`;
+### 模式参考：
+- pomodoro: 25min 专注 + 5min 休息
+- deep_work: 45-90min 专注 + 10-15min 休息
+- short_break: 5-10min 休息
+- long_break: 15-30min 休息`;
         break;
 
       case 'chat':
-        systemPrompt = `你是一个友好的AI助手，可以回答用户日常问题，提供信息和建议。尽量给出简洁、有帮助的回答。如果用户问到与时间管理相关的问题，可以推荐番茄工作法并说明如何切换到任务规划模式。`;
+        systemPrompt = `你是一个充满智慧、贴心且高效的 AI 生活助理。你不仅能进行日常对话，还能在交流中潜移默化地引导用户建立更好的生活习惯。
+你的语言风格应该是：
+- 简洁明快：不啰嗦，直击重点。
+- 积极正向：在回答问题时带给人动力。
+- 专家视角：如果用户提到压力、拖延或疲劳，请适时推荐时间管理技巧，并引导他们切换到“任务规划模式”。`;
         break;
 
       case 'study':
-        systemPrompt = `你是一个专业的学习助手，可以帮助用户解答学习问题，提供学习方法和资料推荐。
+        systemPrompt = `你是一个专业的学术导师和学习方法论专家。你精通费曼学习法、康奈尔笔记法和主动回忆等高效学习技术。
 当用户提出学习问题时，请：
-1. 提供简明扼要的解答
-2. 推荐高效学习方法
-3. 如果适合，建议用户尝试番茄工作法进行学习，并可以切换到任务规划模式
-
-如果用户上传了图片（如习题、笔记等），请分析图片内容并提供相应的帮助。`;
+1. **深度解答**：不仅给出答案，更要解释背后的逻辑。
+2. **方法推介**：根据问题类型，推荐合适的学习策略（如：这个概念你可以尝试用费曼学习法向我复述一遍）。
+3. **视觉分析**：如果用户上传了图片（如习题、笔记），请进行细致的 OCR 识别和逻辑分析。
+4. **专注建议**：提醒用户学习过程中的专注度比时长更重要，建议配合番茄钟进行。`;
         break;
     }
 
@@ -347,10 +341,11 @@ JSON格式示例：
 
       // 创建API请求
       const request: any = {
-        model: "deepseek-chat",
+        model: this.getAiModel(),
         messages: apiMessages,
         stream: false,
-        ApiKey: apiKey // 确保ApiKey字段名称与后端预期一致
+        ApiKey: apiKey,
+        base_url: this.getAiBaseUrl()
       };
 
       console.log('发送API请求:', JSON.stringify({
@@ -546,7 +541,8 @@ JSON格式示例：
       console.log('准备调用Go后端API', {
         model: request.model,
         messagesCount: request.messages.length,
-        hasApiKey: !!request.ApiKey
+        hasApiKey: !!request.ApiKey,
+        baseUrl: request.base_url
       });
 
       // 创建DeepSeekAPIRequest对象
@@ -557,9 +553,14 @@ JSON格式示例：
 
       // 将ApiKey转换为api_key (后端类型使用api_key)
       apiRequest.api_key = request.ApiKey;
+      apiRequest.base_url = request.base_url;
+
+      console.log('发送给Go的最终对象:', apiRequest);
 
       // 调用Go后端函数
-      return await GoCallDeepSeekAPI(apiRequest);
+      const result = await GoCallDeepSeekAPI(apiRequest);
+      console.log('Go后端返回结果:', result);
+      return result;
     } catch (error) {
       console.error('发送DeepSeek API请求时出错:', error);
       throw error;
@@ -570,29 +571,3 @@ JSON格式示例：
 // 导出单例
 const AIAssistantService = new AIAssistantServiceClass();
 export default AIAssistantService;
-
-// 修改处理DeepSeek API调用的方法
-async function CallDeepSeekAPI(request: any): Promise<any> {
-  try {
-    console.log('准备调用Go后端API', {
-      model: request.model,
-      messagesCount: request.messages.length,
-      hasApiKey: !!request.ApiKey
-    });
-
-    // 创建DeepSeekAPIRequest对象
-    const apiRequest = new types.DeepSeekAPIRequest();
-    apiRequest.model = request.model;
-    apiRequest.messages = request.messages;
-    apiRequest.stream = request.stream || false;
-
-    // 将ApiKey转换为api_key (后端类型使用api_key)
-    apiRequest.api_key = request.ApiKey;
-
-    // 调用Go后端函数
-    return await GoCallDeepSeekAPI(apiRequest);
-  } catch (error) {
-    console.error('发送DeepSeek API请求时出错:', error);
-    throw error;
-  }
-}

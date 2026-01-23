@@ -28,8 +28,7 @@ const apiKey = computed({
   get: () => aiSettings.value.apiKey,
   set: (value) => {
     settingsStore.updateAISettings({
-      apiKey: value,
-      model: 'deepseek' // 始终使用deepseek模型
+      apiKey: value
     })
     // 重置测试状态
     apiKeyFormState.value.testSuccess = false
@@ -47,19 +46,11 @@ const saveSettings = () => {
 
   // 使用store提供的方法保存设置
   settingsStore.updateAISettings({
-    model: 'deepseek', // 始终使用deepseek模型
     apiKey: apiKey.value
   })
 
   // 同时更新AIAssistantService中的apiKey
   AIAssistantService.setApiKey(apiKey.value)
-
-  // 确保数据已保存到localStorage
-  localStorage.setItem('aiSettings', JSON.stringify({
-    model: 'deepseek',
-    apiKey: apiKey.value,
-    enabled: true
-  }));
 
   message.success('设置已保存')
   console.log('API密钥已保存:', apiKey.value.slice(0, 5) + '******');
@@ -86,17 +77,9 @@ const testApiKey = async () => {
 
     // 2. 保存到settingsStore
     settingsStore.updateAISettings({
-      model: 'deepseek',
       apiKey: apiKey.value,
       enabled: true
     })
-
-    // 3. 直接保存到localStorage (确保冗余保存)
-    localStorage.setItem('aiSettings', JSON.stringify({
-      model: 'deepseek',
-      apiKey: apiKey.value,
-      enabled: true
-    }));
 
     console.log('API密钥已保存，正在测试连接...');
 

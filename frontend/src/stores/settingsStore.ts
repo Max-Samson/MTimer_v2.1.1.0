@@ -15,6 +15,8 @@ interface AISettings {
   enabled: boolean
   apiKey: string
   model: string
+  provider: 'deepseek' | 'qwen' | 'zhipu' | 'openai' | 'custom'
+  baseUrl?: string
 }
 
 interface SoundSettings {
@@ -36,7 +38,9 @@ export const useSettingsStore = defineStore('settings', () => {
   const aiSettings = ref<AISettings>({
     enabled: false,
     apiKey: '',
-    model: 'deepseek' // 默认使用deepseek模型
+    model: 'deepseek-chat',
+    provider: 'deepseek',
+    baseUrl: 'https://api.deepseek.com/v1'
   })
 
   // 音乐设置
@@ -64,9 +68,15 @@ export const useSettingsStore = defineStore('settings', () => {
     const settings = localStorage.getItem('aiSettings')
     if (settings) {
       aiSettings.value = JSON.parse(settings)
-      // 确保model字段存在且为deepseek
+      // 确保新字段存在
+      if (!aiSettings.value.provider) {
+        aiSettings.value.provider = 'deepseek'
+      }
       if (!aiSettings.value.model) {
-        aiSettings.value.model = 'deepseek'
+        aiSettings.value.model = aiSettings.value.provider === 'deepseek' ? 'deepseek-chat' : 'gpt-3.5-turbo'
+      }
+      if (!aiSettings.value.baseUrl && aiSettings.value.provider === 'deepseek') {
+        aiSettings.value.baseUrl = 'https://api.deepseek.com/v1'
       }
     }
   }

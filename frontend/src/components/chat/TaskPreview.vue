@@ -25,13 +25,15 @@
         <n-button
           type="primary"
           size="small"
+          :loading="isApplying"
+          :disabled="isApplying"
           class="bg-indigo-500 hover:bg-indigo-600 transition-all duration-300 transform hover:-translate-y-1 hover:shadow-md"
           @click="handleApply"
         >
           <template #icon>
-            <n-icon><CheckmarkFilled /></n-icon>
+            <n-icon v-if="!isApplying"><CheckmarkFilled /></n-icon>
           </template>
-          应用计划
+          {{ isApplying ? '正在应用...' : '应用计划' }}
         </n-button>
       </div>
     </div>
@@ -147,6 +149,8 @@ const emit = defineEmits<{
 
 // 展开/折叠状态
 const isExpanded = ref(false);
+// 正在应用状态
+const isApplying = ref(false);
 
 // 格式化专注模式
 function formatMode(mode: string): string {
@@ -188,7 +192,14 @@ function formatCompletionTime(): string {
 
 // 处理应用按钮点击
 function handleApply(): void {
+  if (isApplying.value) return;
+  isApplying.value = true;
   emit('apply');
+  
+  // 8秒后自动重置，防止因为某种原因没有跳转而导致按钮一直处于加载状态
+  setTimeout(() => {
+    isApplying.value = false;
+  }, 8000);
 }
 </script>
 

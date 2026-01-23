@@ -79,7 +79,7 @@ func (a *App) startup(ctx context.Context) {
 		focusSessionRepo,
 		eventStatRepo,
 	)
-	a.aiController = &controllers.AIController{}
+	a.aiController = controllers.NewAIController()
 	a.aiCopilotController = controllers.NewAICopilotController(models.GetDB())
 
 	log.Println("应用启动成功")

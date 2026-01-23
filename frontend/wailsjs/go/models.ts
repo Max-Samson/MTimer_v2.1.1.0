@@ -287,6 +287,7 @@ export namespace types {
 	    messages: DeepSeekMessage[];
 	    stream: boolean;
 	    api_key?: string;
+	    base_url?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new DeepSeekAPIRequest(source);
@@ -298,6 +299,7 @@ export namespace types {
 	        this.messages = this.convertValues(source["messages"], DeepSeekMessage);
 	        this.stream = source["stream"];
 	        this.api_key = source["api_key"];
+	        this.base_url = source["base_url"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {

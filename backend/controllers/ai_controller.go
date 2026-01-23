@@ -47,6 +47,24 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 		logger.Info("使用请求中提供的API密钥")
 	}
 
+	// 使用Base URL，优先使用请求中的Base URL
+	apiBaseURL := c.apiBaseURL
+	if req.BaseURL != "" {
+		apiBaseURL = req.BaseURL
+		// 确保 URL 以 /v1/chat/completions 结尾，或者直接使用提供的完整 URL
+		if !strings.HasSuffix(apiBaseURL, "/chat/completions") {
+			if strings.HasSuffix(apiBaseURL, "/") {
+				apiBaseURL += "chat/completions"
+			} else {
+				apiBaseURL += "/chat/completions"
+			}
+		}
+	}
+	logger.WithFields(map[string]interface{}{
+		"url":   apiBaseURL,
+		"model": req.Model,
+	}).Info("准备发送 AI API 请求")
+
 	// 检查API密钥是否为空
 	if apiKey == "" {
 		logger.Info("API密钥未设置，使用模拟响应")
@@ -54,8 +72,12 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	}
 
 	// 准备请求数据
-	// 创建新的请求对象，不包含ApiKey字段
-	apiReq := types.DeepSeekAPIRequest{
+	// 创建新的请求对象，不包含ApiKey和BaseURL字段，因为它们是给后端用的
+	apiReq := struct {
+		Model    string            `json:"model"`
+		Messages []types.DeepSeekMessage `json:"messages"`
+		Stream   bool              `json:"stream"`
+	}{
 		Model:    req.Model,
 		Messages: req.Messages,
 		Stream:   req.Stream,
@@ -66,7 +88,7 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	}
 
 	// 创建HTTP请求
-	httpReq, err := http.NewRequest("POST", c.apiBaseURL, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequest("POST", apiBaseURL, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("创建HTTP请求失败: %v", err)
 	}
@@ -79,6 +101,7 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	client := &http.Client{}
 	resp, err := client.Do(httpReq)
 	if err != nil {
+		logger.WithError(err).Error("发送 AI API 请求失败")
 		return nil, fmt.Errorf("发送请求失败: %v", err)
 	}
 	defer resp.Body.Close()
@@ -86,6 +109,10 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	// 检查响应状态码
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
+		logger.WithFields(map[string]interface{}{
+			"status": resp.StatusCode,
+			"body":   string(body),
+		}).Error("AI API 返回错误状态码")
 		return nil, fmt.Errorf("API请求失败，状态码: %d, 错误: %s", resp.StatusCode, string(body))
 	}
 

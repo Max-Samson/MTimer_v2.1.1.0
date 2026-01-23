@@ -11,7 +11,8 @@ type DeepSeekAPIRequest struct {
 	Model    string            `json:"model"`
 	Messages []DeepSeekMessage `json:"messages"`
 	Stream   bool              `json:"stream"`
-	ApiKey   string            `json:"api_key,omitempty"` // 可选API密钥，不发送到DeepSeek API
+	ApiKey   string            `json:"api_key,omitempty"`  // 可选API密钥，不发送到DeepSeek API
+	BaseURL  string            `json:"base_url,omitempty"` // 可选Base URL，默认为DeepSeek
 }
 
 // DeepSeekChoice 表示API返回的选择

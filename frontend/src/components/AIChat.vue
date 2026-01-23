@@ -5,21 +5,18 @@
       <n-icon size="64" class="text-indigo-500 mb-6 animate-pulse">
         <Key />
       </n-icon>
-      <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3">需要DeepSeek API密钥</h3>
+      <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3">未配置 AI API 密钥</h3>
       <p class="text-gray-600 dark:text-gray-300 mb-6 max-w-md leading-relaxed">
-        要使用AI助手功能，您需要设置DeepSeek API密钥。
-        DeepSeek是一个强大的AI模型，可以帮助您规划任务和回答问题。
+        要使用智能助手功能，您需要配置 API 密钥。
+        我们支持 DeepSeek、通义千问、智谱等多种大模型。
       </p>
       <div class="space-y-4 w-full max-w-xs">
-        <n-button type="primary" size="large" class="w-full bg-indigo-500 hover:bg-indigo-600 transition-all duration-300 transform hover:-translate-y-1" @click="goToSettings">
+        <n-button type="primary" size="large" class="w-full bg-indigo-500 hover:bg-indigo-600 transition-all duration-300 transform hover:-translate-y-1" @click="$emit('open-settings')">
           <template #icon>
             <n-icon><Settings /></n-icon>
           </template>
-          去设置API密钥
+          去配置 API 密钥
         </n-button>
-        <div class="text-sm text-gray-500 dark:text-gray-400 px-4">
-          <p>您可以在<a href="https://platform.deepseek.com/" target="_blank" class="text-indigo-500 hover:underline">DeepSeek平台</a>上注册并获取API密钥</p>
-        </div>
       </div>
     </div>
 
@@ -94,8 +91,8 @@
       </div>
 
       <!-- 输入区域 - 使用flex-shrink-0确保不被压缩 -->
-      <div class="input-area p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
-        <div class="input-container relative">
+      <div class="input-area p-4 border-t border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md flex-shrink-0">
+        <div class="input-container relative max-w-4xl mx-auto">
           <n-input
             v-model:value="inputText"
             type="textarea"
@@ -103,15 +100,15 @@
             placeholder="描述你想要完成的任务，或者问任何问题..."
             @keydown.enter.exact.prevent="handleSend"
             :disabled="isLoading"
-            class="chat-input bg-white dark:bg-gray-700 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 focus-within:ring-2 focus-within:ring-indigo-500/50 dark:focus-within:ring-indigo-400/60"
+            class="chat-input bg-gray-50 dark:bg-gray-700/50 rounded-xl shadow-inner transition-all duration-300 focus-within:ring-2 focus-within:ring-indigo-500/30 dark:focus-within:ring-indigo-400/30"
           />
 
-          <div class="input-actions flex justify-between items-center mt-3">
+          <div class="input-actions flex justify-between items-center mt-3 px-1">
             <div class="input-tools flex items-center gap-2">
               <n-tooltip trigger="hover" placement="top">
                 <template #trigger>
-                  <n-button circle size="small" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all duration-300 hover:-translate-y-1" @click="clearInput">
-                    <n-icon><Close /></n-icon>
+                  <n-button circle secondary size="small" class="transition-all duration-300 hover:rotate-90" @click="clearInput">
+                    <template #icon><n-icon><Close /></n-icon></template>
                   </n-button>
                 </template>
                 <span>清空输入</span>
@@ -120,11 +117,12 @@
 
             <div class="action-buttons flex space-x-3">
               <n-button
-                tertiary
+                secondary
+                round
                 size="small"
                 @click="$emit('clear-history')"
                 :disabled="isLoading || chatHistory.length === 0"
-                class="text-gray-600 dark:text-gray-300 transition-all duration-300 hover:-translate-y-1"
+                class="transition-all duration-300 hover:bg-red-50 dark:hover:bg-red-900/20"
               >
                 <template #icon>
                   <n-icon><Delete /></n-icon>
@@ -133,10 +131,11 @@
               </n-button>
               <n-button
                 type="primary"
+                round
                 :disabled="!inputText.trim() || isLoading"
                 @click="handleSend"
                 :loading="isLoading"
-                class="bg-indigo-500 hover:bg-indigo-600 text-white transition-all duration-300 transform hover:-translate-y-1 shadow-md hover:shadow-lg dark:shadow-indigo-500/30"
+                class="bg-indigo-600 hover:bg-indigo-700 text-white transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-indigo-500/20"
               >
                 <template #icon>
                   <n-icon><Send /></n-icon>
@@ -163,10 +162,9 @@ import { Key } from '@vicons/ionicons5';
 import { ChatMessage, TaskPlan } from '../services/AIAssistantService';
 import MessageBubble from './chat/MessageBubble.vue';
 import TaskPreview from './chat/TaskPreview.vue';
-import { useMessage, NSpin } from 'naive-ui';
+import { useMessage, NSpin, NIcon, NButton, NTooltip, NInput } from 'naive-ui';
 import { useSettingsStore } from '../stores';
 import { useRouter } from 'vue-router';
-import AIAssistantService from '../services/AIAssistantService';
 import { PropType } from 'vue';
 
 const props = defineProps({
@@ -193,6 +191,7 @@ const emit = defineEmits<{
   (e: 'clear-history'): void;
   (e: 'regenerate', messageIndex: number): void;
   (e: 'feedback', messageIndex: number, type: string, value: boolean): void;
+  (e: 'open-settings'): void;
 }>();
 
 const message = useMessage();
@@ -218,19 +217,8 @@ const handleSend = () => {
 watch(() => props.chatHistory, async (newValue) => {
   // 防御性检查，避免undefined引用错误
   if (!newValue) {
-    console.warn('AIChat监测到chatHistory为undefined');
     return;
   }
-
-  console.log('AIChat监测到聊天历史变化', {
-    length: newValue?.length || 0,
-    messages: newValue?.slice(-2).map(m => ({
-      role: m?.role,
-      content: m?.content?.substring(0, 30) + '...',
-      hasTaskData: !!m?.taskData?.length,
-      timestamp: new Date(m?.timestamp).toLocaleTimeString()
-    })) || []
-  });
 
   await nextTick();
   scrollToBottom();
@@ -264,62 +252,16 @@ const clearInput = () => {
   });
 };
 
-// 处理消息反馈
-const handleFeedback = (messageIndex: number, event: { type: 'like' | 'dislike'; value: boolean }) => {
-  const { type, value } = event;
-  emit('feedback', messageIndex, type, value);
-
-  // 可以在这里实现反馈提示
-  if (value) {
-    message.success(`已${type === 'like' ? '点赞' : '反馈'}`);
-  }
-};
-
 // 重新生成回复
 const regenerateResponse = (messageIndex: number) => {
   emit('regenerate', messageIndex);
 };
 
-// 添加调试函数，检查聊天历史数据
-const validateChatHistory = () => {
-  if (!props.chatHistory) {
-    console.error('AIChat组件：chatHistory为空或未定义');
-    return false;
-  }
-
-  if (!Array.isArray(props.chatHistory)) {
-    console.error('AIChat组件：chatHistory不是数组', typeof props.chatHistory);
-    return false;
-  }
-
-  if (props.chatHistory.length === 0) {
-    console.warn('AIChat组件：chatHistory数组为空');
-    return true;
-  }
-
-  const sample = props.chatHistory[props.chatHistory.length - 1];
-  console.log('AIChat组件：最新消息样例', {
-    role: sample?.role,
-    content: sample?.content?.substring(0, 50),
-    timestamp: sample?.timestamp ? new Date(sample.timestamp).toLocaleTimeString() : '无'
-  });
-  return true;
-};
-
 // 在组件挂载后验证数据
 onMounted(() => {
-  console.log('AIChat组件已挂载', {
-    chatHistoryLength: props.chatHistory?.length || 0,
-    isLoading: props.isLoading,
-    chatMode: props.chatMode,
-    API密钥: hasApiKey.value ? '已设置' : '未设置'
-  });
-
-  validateChatHistory();
-
   // 如果API密钥未设置，显示提示
   if (!hasApiKey.value) {
-    message.info('需要设置DeepSeek API密钥才能使用AI助手功能');
+    message.info('请先配置 AI API 密钥才能使用助手功能');
   }
 
   // 为空时自动聚焦输入框
@@ -352,11 +294,6 @@ const useExamplePrompt = (prompt: string) => {
       (chatInput as HTMLTextAreaElement).focus();
     }
   });
-};
-
-// 前往设置页面
-const goToSettings = () => {
-  router.push('/settings');
 };
 </script>
 
@@ -414,14 +351,19 @@ const goToSettings = () => {
 }
 
 .thinking-container {
-  animation: thinkingPulse 2s infinite;
+  padding: 12px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(168, 85, 247, 0.05));
+  animation: thinkingPulse 2s infinite ease-in-out;
 }
 
 .thinking-dots .dot {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: bold;
   line-height: 1;
   display: inline-block;
+  color: #6366f1;
 }
 
 .example-prompt {

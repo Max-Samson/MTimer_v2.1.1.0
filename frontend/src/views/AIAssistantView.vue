@@ -13,6 +13,9 @@
             <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 m-0 flex items-center gap-2">
               AI 时间专注助手
               <n-badge dot processing type="success" class="ml-1" v-if="hasValidAPI" />
+              <span class="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1 hidden md:inline-block">
+                ({{ settingsStore.aiSettings.provider }}: {{ settingsStore.aiSettings.model }})
+              </span>
             </h1>
           </div>
         </div>
@@ -63,21 +66,94 @@
           <n-tooltip trigger="hover" placement="bottom">
             <template #trigger>
               <n-button
-                @click="showDebugPanel = !showDebugPanel"
+                @click="showSettingsModal = true"
                 size="small"
                 class="settings-button bg-gradient-to-r from-teal-50 to-green-50 dark:from-teal-900/40 dark:to-green-900/30 text-teal-600 dark:text-teal-300 hover:shadow hover:-translate-y-0.5 transition-all duration-300 dark:shadow-teal-600/10"
               >
                 <template #icon>
-                  <n-icon size="18"><Tools /></n-icon>
+                  <n-icon size="18"><Settings /></n-icon>
                 </template>
                 <span class="text-xs ml-1">设置</span>
               </n-button>
             </template>
-            <span>AI聊天测试设置</span>
+            <span>AI 模型设置</span>
           </n-tooltip>
         </div>
       </div>
     </div>
+
+    <!-- AI 模型设置模态框 -->
+    <n-modal v-model:show="showSettingsModal" transform-origin="center">
+      <n-card
+        style="width: 500px; border-radius: 12px;"
+        title="AI 助手大模型设置"
+        :bordered="false"
+        size="huge"
+        role="dialog"
+        aria-modal="true"
+        closable
+        @close="showSettingsModal = false"
+      >
+        <template #header-extra>
+          <n-icon size="24" class="text-indigo-500"><Bot /></n-icon>
+        </template>
+
+        <n-form :model="aiSettingsForm" label-placement="left" label-width="100">
+          <n-form-item label="启用 AI">
+            <n-switch v-model:value="aiSettingsForm.enabled" />
+          </n-form-item>
+          
+          <n-form-item label="服务商">
+            <n-select
+              v-model:value="aiSettingsForm.provider"
+              :options="providerOptions"
+              placeholder="选择 AI 服务商"
+            />
+          </n-form-item>
+
+          <n-form-item label="API 密钥">
+            <n-input
+              v-model:value="aiSettingsForm.apiKey"
+              type="password"
+              show-password-on="click"
+              placeholder="输入您的 API Key"
+            />
+          </n-form-item>
+
+          <n-form-item label="模型名称">
+            <n-input
+              v-model:value="aiSettingsForm.model"
+              placeholder="例如: deepseek-chat, qwen-max"
+            />
+          </n-form-item>
+
+          <n-form-item label="API 地址">
+            <n-input
+              v-model:value="aiSettingsForm.baseUrl"
+              placeholder="API 基础路径 (Base URL)"
+            />
+            <template #feedback>
+              <div class="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <n-icon size="14"><Information /></n-icon>
+                通常以 /v1 结尾
+              </div>
+            </template>
+          </n-form-item>
+        </n-form>
+
+        <template #footer>
+          <div class="flex justify-end gap-3">
+            <n-button @click="showSettingsModal = false">取消</n-button>
+            <n-button type="primary" @click="saveSettings" icon-placement="left">
+              <template #icon>
+                <n-icon><Save /></n-icon>
+              </template>
+              保存设置
+            </n-button>
+          </div>
+        </template>
+      </n-card>
+    </n-modal>
 
     <!-- 聊天区域容器 - 固定高度并使用overflow属性 -->
     <div class="chat-container flex-1 px-4 py-2 md:px-6 lg:px-8 overflow-hidden flex flex-col">
@@ -116,6 +192,7 @@
           @clear-history="clearHistory"
           @regenerate="regenerateResponse"
           @feedback="handleFeedback"
+          @open-settings="showSettingsModal = true"
           class="animate-fadeIn h-full"
         />
       </div>
@@ -125,9 +202,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed, watch, Ref, nextTick } from 'vue';
-import { useMessage, NTooltip, NButton, NIcon } from 'naive-ui';
+import { useMessage, NTooltip, NButton, NIcon, NDropdown, NBadge, NModal, NCard, NForm, NFormItem, NInput, NSelect, NSpace, NSwitch } from 'naive-ui';
 import { useRouter } from 'vue-router';
-import { Bot, Reset, Chat, Time, Education, Tools, Renew } from '@vicons/carbon';
+import { Bot, Reset, Chat, Time, Education, Tools, Renew, Settings, Information, Save, Close, Warning } from '@vicons/carbon';
 import AIAssistantService, { TaskPlan, ChatMode } from '../services/AIAssistantService';
 import AIChat from '../components/AIChat.vue';
 import { useSettingsStore } from '../stores';
@@ -164,6 +241,56 @@ try {
 }
 
 const showDebugPanel = ref(false); // 默认不显示调试面板
+const showSettingsModal = ref(false);
+
+// AI 设置表单
+const aiSettingsForm = ref({
+  provider: settingsStore.aiSettings.provider || 'deepseek',
+  model: settingsStore.aiSettings.model || 'deepseek-chat',
+  apiKey: settingsStore.aiSettings.apiKey || '',
+  baseUrl: settingsStore.aiSettings.baseUrl || 'https://api.deepseek.com/v1',
+  enabled: settingsStore.aiSettings.enabled ?? true
+});
+
+// 服务商选项
+const providerOptions = [
+  { label: 'DeepSeek', value: 'deepseek' },
+  { label: '通义千问 (Qwen)', value: 'qwen' },
+  { label: '智谱 AI (Zhipu)', value: 'zhipu' },
+  { label: 'OpenAI', value: 'openai' },
+  { label: '自定义 (Custom)', value: 'custom' }
+];
+
+// 默认模型和 BaseURL 映射
+const providerDefaults: Record<string, { model: string, baseUrl: string }> = {
+  deepseek: { model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com/v1' },
+  qwen: { model: 'qwen-max', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  zhipu: { model: 'glm-4', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  openai: { model: 'gpt-3.5-turbo', baseUrl: 'https://api.openai.com/v1' },
+  custom: { model: '', baseUrl: '' }
+};
+
+// 监听服务商变化，自动填充默认值
+watch(() => aiSettingsForm.value.provider, (newProvider) => {
+  if (providerDefaults[newProvider]) {
+    aiSettingsForm.value.model = providerDefaults[newProvider].model;
+    aiSettingsForm.value.baseUrl = providerDefaults[newProvider].baseUrl;
+  }
+});
+
+// 保存设置
+const saveSettings = () => {
+  settingsStore.updateAISettings({
+    provider: aiSettingsForm.value.provider as any,
+    model: aiSettingsForm.value.model,
+    apiKey: aiSettingsForm.value.apiKey,
+    baseUrl: aiSettingsForm.value.baseUrl,
+    enabled: aiSettingsForm.value.enabled
+  });
+  AIAssistantService.setApiKey(aiSettingsForm.value.apiKey);
+  showSettingsModal.value = false;
+  message.success('AI 设置已保存');
+};
 
 // 检查是否有有效的API密钥
 const hasValidAPI = computed(() => {
@@ -223,17 +350,20 @@ const sendMessage = async (input: string) => {
 
 // 应用计划
 const applyPlan = async (taskPlan: TaskPlan[]) => {
-  message.info('正在应用计划，请稍候...');
+  message.loading('正在为您创建专注任务...', { duration: 0 });
   const success = await AIAssistantService.applyTaskPlan(taskPlan);
 
+  // 清除所有消息（主要是上面的loading消息）
+  message.destroyAll();
+
   if (success) {
-    message.success('计划已应用，已为你创建任务');
-    // 导航到待办事项页面
+    message.success('计划应用成功！正在前往待办事项页...');
+    // 缩短导航延迟，提升响应感
     setTimeout(() => {
       router.push('/todo');
-    }, 1500);
+    }, 800);
   } else {
-    message.error('应用计划失败，请稍后再试');
+    message.error('应用计划失败，请检查连接或稍后再试');
   }
 };
 
@@ -336,7 +466,7 @@ onMounted(() => {
   // 如果没有API密钥，提示用户设置
   if (!hasValidAPI.value) {
     setTimeout(() => {
-      message.warning('请设置DeepSeek API密钥以使用AI助手功能');
+      message.warning('请在设置中配置 AI API 密钥以开启智能助手');
     }, 1000);
   }
 
