@@ -544,10 +544,13 @@ export namespace types {
 	}
 	
 	export class StatSummary {
-	    total_pomodoro_count: number;
-	    total_focus_minutes: number;
-	    total_focus_hours: number;
-	    streak_days: number;
+	    todayCompletedPomodoros: number;
+	    todayCompletedTasks: number;
+	    todayFocusTime: number;
+	    weekCompletedPomodoros: number;
+	    weekCompletedTasks: number;
+	    weekFocusTime: number;
+	    streakDays: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new StatSummary(source);
@@ -555,10 +558,13 @@ export namespace types {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.total_pomodoro_count = source["total_pomodoro_count"];
-	        this.total_focus_minutes = source["total_focus_minutes"];
-	        this.total_focus_hours = source["total_focus_hours"];
-	        this.streak_days = source["streak_days"];
+	        this.todayCompletedPomodoros = source["todayCompletedPomodoros"];
+	        this.todayCompletedTasks = source["todayCompletedTasks"];
+	        this.todayFocusTime = source["todayFocusTime"];
+	        this.weekCompletedPomodoros = source["weekCompletedPomodoros"];
+	        this.weekCompletedTasks = source["weekCompletedTasks"];
+	        this.weekFocusTime = source["weekFocusTime"];
+	        this.streakDays = source["streakDays"];
 	    }
 	}
 	

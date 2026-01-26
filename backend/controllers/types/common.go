@@ -94,10 +94,13 @@ type StatResponse struct {
 	TimeRanges         []string `json:"time_ranges"`
 }
 
-// StatSummary 表示统计摘要
+// StatSummary 表示统计摘要（今日和本周）
 type StatSummary struct {
-	TotalPomodoroCount int     `json:"total_pomodoro_count"`
-	TotalFocusMinutes  int     `json:"total_focus_minutes"`
-	TotalFocusHours    float64 `json:"total_focus_hours"`
-	StreakDays         int     `json:"streak_days"`
+	TodayCompletedPomodoros int `json:"todayCompletedPomodoros"`
+	TodayCompletedTasks     int `json:"todayCompletedTasks"`
+	TodayFocusTime          int `json:"todayFocusTime"`
+	WeekCompletedPomodoros  int `json:"weekCompletedPomodoros"`
+	WeekCompletedTasks      int `json:"weekCompletedTasks"`
+	WeekFocusTime           int `json:"weekFocusTime"`
+	StreakDays              int `json:"streakDays"`
 }

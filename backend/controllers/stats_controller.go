@@ -102,54 +102,90 @@ func (c *StatsController) UpdateStats(date string) (types.BasicResponse, error) 
 	}, nil
 }
 
-// GetSummary 获取概要统计信息
+// GetSummary 获取概要统计信息（今日和本周）
 func (c *StatsController) GetSummary() (*types.StatSummary, error) {
-	// 获取总数据
-	totalPomodoros, err := models.DB.Query(`
-		SELECT COUNT(*) FROM focus_sessions WHERE mode = 0 AND end_time IS NOT NULL
-	`)
+	today := time.Now().Format("2006-01-02")
+	weekAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
+
+	// 获取今日完成的番茄数（mode = 0表示番茄模式）
+	var todayPomodoros int
+	err := models.DB.QueryRow(`
+		SELECT COUNT(*) FROM focus_sessions
+		WHERE DATE(start_time) = ? AND mode = 0 AND end_time IS NOT NULL
+	`, today).Scan(&todayPomodoros)
 	if err != nil {
-		return nil, err
-	}
-	defer totalPomodoros.Close()
-
-	var pomodoroCount int
-	if totalPomodoros.Next() {
-		err = totalPomodoros.Scan(&pomodoroCount)
-		if err != nil {
-			return nil, err
-		}
+		log.Printf("获取今日番茄数失败: %v", err)
 	}
 
-	// 获取总专注时间
-	totalMinutes, err := models.DB.Query(`
-		SELECT SUM(duration) FROM focus_sessions WHERE end_time IS NOT NULL
-	`)
+	// 获取今日专注时长（所有模式，包括番茄和自定义模式）
+	var todayFocusMinutes int
+	err = models.DB.QueryRow(`
+		SELECT COALESCE(SUM(duration), 0) FROM focus_sessions
+		WHERE DATE(start_time) = ? AND end_time IS NOT NULL
+	`, today).Scan(&todayFocusMinutes)
 	if err != nil {
-		return nil, err
+		log.Printf("获取今日专注时长失败: %v", err)
 	}
-	defer totalMinutes.Close()
 
-	var focusMinutes int
-	if totalMinutes.Next() {
-		err = totalMinutes.Scan(&focusMinutes)
-		if err != nil {
-			return nil, err
-		}
+	// 获取今日完成任务数（从event_stats表查询）
+	var todayTasks int
+	err = models.DB.QueryRow(`
+		SELECT COUNT(DISTINCT event_id) FROM event_stats
+		WHERE date = ? AND completed = 1
+	`, today).Scan(&todayTasks)
+	if err != nil {
+		log.Printf("获取今日完成任务数失败: %v", err)
+	}
+
+	// 获取本周完成的番茄数
+	var weekPomodoros int
+	err = models.DB.QueryRow(`
+		SELECT COUNT(*) FROM focus_sessions
+		WHERE DATE(start_time) >= ? AND mode = 0 AND end_time IS NOT NULL
+	`, weekAgo).Scan(&weekPomodoros)
+	if err != nil {
+		log.Printf("获取本周番茄数失败: %v", err)
+	}
+
+	// 获取本周专注时长
+	var weekFocusMinutes int
+	err = models.DB.QueryRow(`
+		SELECT COALESCE(SUM(duration), 0) FROM focus_sessions
+		WHERE DATE(start_time) >= ? AND end_time IS NOT NULL
+	`, weekAgo).Scan(&weekFocusMinutes)
+	if err != nil {
+		log.Printf("获取本周专注时长失败: %v", err)
+	}
+
+	// 获取本周完成任务数
+	var weekTasks int
+	err = models.DB.QueryRow(`
+		SELECT COUNT(DISTINCT event_id) FROM event_stats
+		WHERE date >= ? AND completed = 1
+	`, weekAgo).Scan(&weekTasks)
+	if err != nil {
+		log.Printf("获取本周完成任务数失败: %v", err)
 	}
 
 	// 获取连续专注天数
-	today := time.Now().Format("2006-01-02")
 	streakDays, err := c.calculateStreakDays(today)
 	if err != nil {
-		return nil, err
+		log.Printf("获取连续专注天数失败: %v", err)
+		streakDays = 0
 	}
 
+	log.Printf("统计摘要 - 今日: %d番茄, %d任务, %d分钟; 本周: %d番茄, %d任务, %d分钟; 连续: %d天",
+		todayPomodoros, todayTasks, todayFocusMinutes,
+		weekPomodoros, weekTasks, weekFocusMinutes, streakDays)
+
 	return &types.StatSummary{
-		TotalPomodoroCount: pomodoroCount,
-		TotalFocusMinutes:  focusMinutes,
-		TotalFocusHours:    float64(focusMinutes) / 60.0,
-		StreakDays:         streakDays,
+		TodayCompletedPomodoros: todayPomodoros,
+		TodayCompletedTasks:     todayTasks,
+		TodayFocusTime:          todayFocusMinutes,
+		WeekCompletedPomodoros:  weekPomodoros,
+		WeekCompletedTasks:      weekTasks,
+		WeekFocusTime:           weekFocusMinutes,
+		StreakDays:              streakDays,
 	}, nil
 }
 
