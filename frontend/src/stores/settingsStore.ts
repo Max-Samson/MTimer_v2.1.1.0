@@ -4,11 +4,11 @@ import { ref, computed } from 'vue'
 // 音频文件路径 - 不使用/前缀，由audioService动态决定路径前缀
 const AUDIO_PATHS = {
   timerEnd: 'sounds/timer-end.wav',
-  river: 'sounds/river-maas-summer.wav',
-  ocean: 'sounds/hildegard_beats__oceano1.wav',
-  piano: 'sounds/josefpres__piano-loops-186-octave-down-long-loop-120-bpm.wav',
-  birds: 'sounds/tobbler__amb_birds_neckar.wav',
-  chill: 'sounds/zhr__chill-background-music-3.wav'
+  river: 'sounds/river-maas-summer.m4a',
+  ocean: 'sounds/hildegard_beats__oceano1.m4a',
+  piano: 'sounds/josefpres__piano-loops-186-octave-down-long-loop-120-bpm.m4a',
+  birds: 'sounds/tobbler__amb_birds_neckar.m4a',
+  chill: 'sounds/zhr__chill-background-music-3.m4a'
 };
 
 interface AISettings {

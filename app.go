@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"log"
+	"time"
 
 	"MTimer/backend/controllers"
 	"MTimer/backend/controllers/types"
@@ -83,6 +84,9 @@ func (a *App) startup(ctx context.Context) {
 	a.aiCopilotController = controllers.NewAICopilotController(models.GetDB())
 
 	log.Println("应用启动成功")
+
+	// 启动后自动修复历史统计数据
+	go a.repairHistoricalStats()
 }
 
 // OnShutdown is called when the app is closing
@@ -210,4 +214,32 @@ func (a *App) GetBehaviorFeatures(date string) (*types.BehaviorFeatureResponse, 
 func (a *App) ExportForAI(date string) (string, error) {
 	log.Printf("导出 AI 格式数据, 日期: %s", date)
 	return a.aiCopilotController.ExportForAI(date)
+}
+
+// repairHistoricalStats 修复历史统计数据
+// 在应用启动时自动运行，重新计算最近30天的统计数据
+func (a *App) repairHistoricalStats() {
+	// 等待一秒，确保应用完全启动
+	time.Sleep(time.Second)
+
+	log.Println("开始修复历史统计数据...")
+
+	// 获取最近30天的日期范围
+	today := time.Now()
+	daysToRepair := 30 // 修复最近30天的数据
+
+	repairCount := 0
+	for i := 0; i < daysToRepair; i++ {
+		date := today.AddDate(0, 0, -i).Format("2006-01-02")
+
+		// 调用更新统计数据
+		_, err := a.statController.UpdateStats(date)
+		if err != nil {
+			log.Printf("修复 %s 的统计数据失败: %v", date, err)
+		} else {
+			repairCount++
+		}
+	}
+
+	log.Printf("历史统计数据修复完成，共修复 %d 天的数据", repairCount)
 }

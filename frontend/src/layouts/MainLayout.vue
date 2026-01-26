@@ -100,12 +100,17 @@ const windowWidth = ref(window.innerWidth)
 const handleResize = () => windowWidth.value = window.innerWidth
 const drawerWidth = computed(() => windowWidth.value > 1200 ? 1200 : '100%')
 
-onMounted(() => window.addEventListener('resize', handleResize))
-onUnmounted(() => window.removeEventListener('resize', handleResize))
+onMounted(() => {
+    window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+    window.removeEventListener('resize', handleResize)
+})
 </script>
 
 <template>
-    <n-layout position="absolute">
+    <div class="layout-wrapper">
         <n-layout-header class="header" :class="{ 'fullscreen-mode': isFullscreen }">
             <transition name="fade">
                 <div class="top-bar" v-if="!isFullscreen">
@@ -246,14 +251,28 @@ onUnmounted(() => window.removeEventListener('resize', handleResize))
         </n-drawer>
 
         <pomodoro-info-modal v-model:show="showPomodoroInfo" />
-    </n-layout>
+    </div>
     
     <mini-music-controller />
 </template>
 
 <style scoped>
+/* 禁止最外层滚动 */
+.layout-wrapper {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    overscroll-behavior: none;
+}
+
 .header {
     height: 100vh;
+    width: 100%;
     display: flex;
     flex-direction: column;
     padding: 0;
@@ -388,8 +407,9 @@ onUnmounted(() => window.removeEventListener('resize', handleResize))
     justify-content: center;
     align-items: flex-start;
     padding: 20px;
-    height: calc(100vh - 70px);
+    height: auto;
     overflow: hidden;
+    min-height: 0;
 }
 
 .fullscreen-content {
@@ -416,6 +436,7 @@ onUnmounted(() => window.removeEventListener('resize', handleResize))
     flex-direction: column;
     align-items: center;
     transition: transform 0.3s ease;
+    overflow: hidden;
 }
 
 .right-column {
@@ -424,8 +445,11 @@ onUnmounted(() => window.removeEventListener('resize', handleResize))
     border-radius: 16px;
     padding: 20px;
     box-shadow: var(--shadow-light);
-    max-height: 100%;
-    overflow: auto;
+    height: 100%;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
     transition: background-color var(--transition-time) ease, box-shadow var(--transition-time) ease;
 }
 
