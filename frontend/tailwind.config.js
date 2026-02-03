@@ -1,8 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: [
-    "./index.html",
-    "./src/**/*.{vue,js,ts,jsx,tsx}",
+    './index.html',
+    './src/**/*.{vue,js,ts,jsx,tsx}',
   ],
   theme: {
     extend: {
@@ -13,7 +13,7 @@ export default {
         'bounce-slow': 'bounce 1.5s infinite',
         'fadeIn': 'fadeIn 0.5s ease-in-out',
         'fadeIn-slow': 'fadeIn 0.8s ease-in-out',
-        'glow': 'glow 2s ease-in-out infinite alternate'
+        'glow': 'glow 2s ease-in-out infinite alternate',
       },
       keyframes: {
         pulse: {
@@ -27,7 +27,7 @@ export default {
         glow: {
           '0%': { boxShadow: '0 0 5px rgba(99, 102, 241, 0.3)' },
           '100%': { boxShadow: '0 0 15px rgba(99, 102, 241, 0.6)' },
-        }
+        },
       },
       colors: {
         tomato: {

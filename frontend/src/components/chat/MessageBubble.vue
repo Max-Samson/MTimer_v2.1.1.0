@@ -1,10 +1,174 @@
+<script setup lang="ts">
+import { Bot, Copy, Download, Reset, ThumbsDown, ThumbsUp, UserAvatar } from '@vicons/carbon'
+import { formatDistanceToNow } from 'date-fns'
+import { zhCN } from 'date-fns/locale'
+import { NScrollbar, useMessage } from 'naive-ui'
+import { ref } from 'vue'
+
+const props = defineProps<{
+  content: string
+  isUser: boolean
+  timestamp: number
+  image?: string | null
+}>()
+
+const emit = defineEmits<{
+  (e: 'regenerate'): void
+  (e: 'feedback', type: 'like' | 'dislike', value: boolean): void
+}>()
+
+const message = useMessage()
+const liked = ref(false)
+const disliked = ref(false)
+const showImagePreview = ref(false)
+
+// 格式化时间
+function formatTime(timestamp: number): string {
+  return formatDistanceToNow(new Date(timestamp), {
+    addSuffix: true,
+    locale: zhCN,
+  })
+}
+
+// 复制消息内容
+function copyMessage() {
+  navigator.clipboard.writeText(props.content)
+    .then(() => {
+      message.success('已复制到剪贴板')
+    })
+    .catch(() => {
+      message.error('复制失败，请手动复制')
+    })
+}
+
+// 点赞/取消点赞
+function toggleLike() {
+  if (disliked.value) {
+    disliked.value = false
+  }
+  liked.value = !liked.value
+  emit('feedback', 'like', liked.value)
+}
+
+// 不喜欢/取消不喜欢
+function toggleDislike() {
+  if (liked.value) {
+    liked.value = false
+  }
+  disliked.value = !disliked.value
+  emit('feedback', 'dislike', disliked.value)
+}
+
+// 重新生成回复
+function regenerateResponse() {
+  emit('regenerate')
+}
+
+// 预览图片
+function previewImage() {
+  if (props.image) {
+    showImagePreview.value = true
+  }
+}
+
+// 下载图片
+function downloadImage() {
+  if (!props.image)
+    return
+
+  const link = document.createElement('a')
+  link.href = props.image
+  link.download = `image_${new Date().getTime()}.png`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
+// 格式化内容为HTML
+function formatContentToHTML(content: string): string {
+  if (!content)
+    return ''
+
+  // 移除可能包含的JSON代码块（适用于任务数据）
+  content = content.replace(/```json\s*([\s\S]*?)```/g, '')
+
+  // 处理代码块（保留非JSON的代码块）
+  content = content.replace(/```([a-z]*)\s*([\s\S]*?)```/g, (match, lang, code) => {
+    if (lang.toLowerCase() === 'json') {
+      return '' // 移除JSON代码块
+    }
+    return `<pre class="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-x-auto my-2"><code class="language-${lang}">${code}</code></pre>`
+  })
+
+  // 处理标题 (h1-h3)
+  content = content.replace(/^### (.*)$/gm, '<h3 class="text-lg font-bold my-2">$1</h3>')
+  content = content.replace(/^## (.*)$/gm, '<h2 class="text-xl font-bold my-3">$1</h2>')
+  content = content.replace(/^# (.*)$/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>')
+
+  // 增强数字序号显示效果（仅处理没有空格缩进的一级序号）
+  content = content.replace(/^(\d+)\.\s+(.+)$/gm, (match, num, text) => {
+    // 防止误处理代码示例中的数字点号
+    if (match.trim().startsWith('```') || match.includes('<pre') || match.includes('<code')) {
+      return match
+    }
+    return `<div class="numbered-item"><span class="number-badge">${num}</span><span class="number-content">${text}</span></div>`
+  })
+
+  // 处理嵌套的数字序号（有空格缩进的序号）
+  content = content.replace(/^(\s+)(\d+)\.\s+(.+)$/gm, (match, indent, num, text) => {
+    // 防止误处理代码示例中的数字点号
+    if (match.trim().startsWith('```') || match.includes('<pre') || match.includes('<code')) {
+      return match
+    }
+    return `${indent}<div class="nested-numbered-item"><span class="nested-number-badge">${num}</span><span class="number-content">${text}</span></div>`
+  })
+
+  // 无序列表处理
+  content = content.replace(/^- (.+)$/gm, '<li class="ml-5 list-disc">$1</li>')
+
+  // 将连续的无序列表项包装在ul标签中
+  content = content.replace(/(<li class="ml-5 list-disc">.*?<\/li>)+/gs, (match) => {
+    return `<ul class="list-disc pl-4 my-2">${match}</ul>`
+  })
+
+  // 处理引用块
+  content = content.replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-1 my-2 text-gray-700 dark:text-gray-300 italic">$1</blockquote>')
+
+  // 转换超链接
+  content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-indigo-600 dark:text-indigo-400 hover:underline">$1</a>')
+
+  // 转换粗体
+  content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+
+  // 转换斜体
+  content = content.replace(/\*([^*]+)\*/g, '<em>$1</em>')
+
+  // 转换行内代码段
+  content = content.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>')
+
+  // 转换双换行为段落
+  content = content.split(/\n\s*\n/).map((p) => {
+    // 跳过已经是HTML标签的内容
+    if (p.startsWith('<h') || p.startsWith('<pre') || p.startsWith('<ul')
+      || p.startsWith('<blockquote') || p.startsWith('<div class="numbered-item')) {
+      return p
+    }
+    return `<p>${p}</p>`
+  }).join('\n\n')
+
+  // 处理段落内的单换行
+  content = content.replace(/([^>])\n([^<])/g, '$1<br>$2')
+
+  return content
+}
+</script>
+
 <template>
   <div
-    :class="[
-      'flex w-full px-4 py-3 items-start gap-4 border-b transition-all duration-300',
+    class="flex w-full px-4 py-3 items-start gap-4 border-b transition-all duration-300" :class="[
       isUser
         ? 'flex-row-reverse bg-indigo-50/70 dark:bg-indigo-900/40 border-gray-100 dark:border-gray-700/40 message-enter-right'
-        : 'border-gray-100 dark:border-gray-700/40 message-enter-left'
+        : 'border-gray-100 dark:border-gray-700/40 message-enter-left',
     ]"
   >
     <!-- 角色标识和头像 -->
@@ -33,18 +197,19 @@
           </template>
         </n-avatar>
       </div>
-      <div class="text-xs mt-1 text-gray-500 dark:text-gray-400">{{ isUser ? '用户' : 'AI助手' }}</div>
+      <div class="text-xs mt-1 text-gray-500 dark:text-gray-400">
+        {{ isUser ? '用户' : 'AI助手' }}
+      </div>
     </div>
 
     <!-- 消息内容 -->
     <div class="flex-1 max-w-[calc(100%-70px)]">
       <!-- 消息主体 -->
       <div
-        :class="[
-          'rounded-lg p-4 shadow-sm transition-all duration-300 hover:shadow-md',
+        class="rounded-lg p-4 shadow-sm transition-all duration-300 hover:shadow-md" :class="[
           isUser
             ? 'bg-green-100 dark:bg-green-900/50 text-gray-800 dark:text-gray-100 rounded-tr-none dark:shadow-green-900/20'
-            : 'bg-gray-100 dark:bg-gray-800/90 text-gray-800 dark:text-gray-100 rounded-tl-none dark:shadow-indigo-900/10'
+            : 'bg-gray-100 dark:bg-gray-800/90 text-gray-800 dark:text-gray-100 rounded-tl-none dark:shadow-indigo-900/10',
         ]"
       >
         <!-- 如果有图片，显示图片 -->
@@ -54,14 +219,14 @@
             :alt="`${isUser ? '用户' : 'AI助手'}上传的图片`"
             class="max-w-full max-h-[300px] object-contain cursor-pointer transition-transform duration-300 hover:scale-[1.03]"
             @click="previewImage"
-          />
+          >
         </div>
 
-        <n-scrollbar class="max-h-[300px]" trigger="hover">
+        <NScrollbar class="max-h-[300px]" trigger="hover">
           <div class="message-content">
-            <div v-html="formatContentToHTML(content || '')" class="prose dark:prose-invert max-w-none prose-sm sm:prose-base"></div>
+            <div class="prose dark:prose-invert max-w-none prose-sm sm:prose-base" v-html="formatContentToHTML(content || '')" />
           </div>
-        </n-scrollbar>
+        </NScrollbar>
       </div>
 
       <!-- 消息时间和操作按钮 -->
@@ -86,9 +251,8 @@
               <n-button
                 circle
                 size="tiny"
-                :class="[
-                  'transform transition-all duration-300 hover:-translate-y-0.5',
-                  liked ? 'text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/40 dark:shadow dark:shadow-green-500/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 dark:hover:shadow dark:hover:shadow-indigo-500/30'
+                class="transform transition-all duration-300 hover:-translate-y-0.5" :class="[
+                  liked ? 'text-green-500 dark:text-green-400 bg-green-50 dark:bg-green-900/40 dark:shadow dark:shadow-green-500/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 dark:hover:shadow dark:hover:shadow-indigo-500/30',
                 ]"
                 @click="toggleLike"
               >
@@ -103,9 +267,8 @@
               <n-button
                 circle
                 size="tiny"
-                :class="[
-                  'transform transition-all duration-300 hover:-translate-y-0.5',
-                  disliked ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/40 dark:shadow dark:shadow-red-500/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 dark:hover:shadow dark:hover:shadow-indigo-500/30'
+                class="transform transition-all duration-300 hover:-translate-y-0.5" :class="[
+                  disliked ? 'text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/40 dark:shadow dark:shadow-red-500/20' : 'text-gray-500 dark:text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 dark:hover:shadow dark:hover:shadow-indigo-500/30',
                 ]"
                 @click="toggleDislike"
               >
@@ -140,7 +303,7 @@
     class="image-preview-modal dark:bg-gray-800 dark:text-gray-100"
   >
     <template #header-extra>
-      <n-button text @click="downloadImage" class="transition-transform duration-200 hover:-translate-y-0.5 dark:text-indigo-400">
+      <n-button text class="transition-transform duration-200 hover:-translate-y-0.5 dark:text-indigo-400" @click="downloadImage">
         <template #icon>
           <n-icon><Download /></n-icon>
         </template>
@@ -148,173 +311,10 @@
       </n-button>
     </template>
     <div class="flex justify-center">
-      <img :src="image" class="max-w-full max-h-[80vh] object-contain transition-all duration-300 hover:scale-[1.05]" />
+      <img :src="image" class="max-w-full max-h-[80vh] object-contain transition-all duration-300 hover:scale-[1.05]">
     </div>
   </n-modal>
 </template>
-
-<script setup lang="ts">
-import { ref } from 'vue';
-import { formatDistanceToNow } from 'date-fns';
-import { zhCN } from 'date-fns/locale';
-import { Bot, UserAvatar, Copy, ThumbsUp, ThumbsDown, Reset, Download } from '@vicons/carbon';
-import { useMessage, NScrollbar } from 'naive-ui';
-
-const props = defineProps<{
-  content: string;
-  isUser: boolean;
-  timestamp: number;
-  image?: string | null;
-}>();
-
-const emit = defineEmits<{
-  (e: 'regenerate'): void;
-  (e: 'feedback', type: 'like' | 'dislike', value: boolean): void;
-}>();
-
-const message = useMessage();
-const liked = ref(false);
-const disliked = ref(false);
-const showImagePreview = ref(false);
-
-// 格式化时间
-function formatTime(timestamp: number): string {
-  return formatDistanceToNow(new Date(timestamp), {
-    addSuffix: true,
-    locale: zhCN
-  });
-}
-
-// 复制消息内容
-function copyMessage() {
-  navigator.clipboard.writeText(props.content)
-    .then(() => {
-      message.success('已复制到剪贴板');
-    })
-    .catch(() => {
-      message.error('复制失败，请手动复制');
-    });
-}
-
-// 点赞/取消点赞
-function toggleLike() {
-  if (disliked.value) {
-    disliked.value = false;
-  }
-  liked.value = !liked.value;
-  emit('feedback', 'like', liked.value);
-}
-
-// 不喜欢/取消不喜欢
-function toggleDislike() {
-  if (liked.value) {
-    liked.value = false;
-  }
-  disliked.value = !disliked.value;
-  emit('feedback', 'dislike', disliked.value);
-}
-
-// 重新生成回复
-function regenerateResponse() {
-  emit('regenerate');
-}
-
-// 预览图片
-function previewImage() {
-  if (props.image) {
-    showImagePreview.value = true;
-  }
-}
-
-// 下载图片
-function downloadImage() {
-  if (!props.image) return;
-
-  const link = document.createElement('a');
-  link.href = props.image;
-  link.download = `image_${new Date().getTime()}.png`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-// 格式化内容为HTML
-function formatContentToHTML(content: string): string {
-  if (!content) return '';
-
-  // 移除可能包含的JSON代码块（适用于任务数据）
-  content = content.replace(/```json\s*([\s\S]*?)```/g, '');
-
-  // 处理代码块（保留非JSON的代码块）
-  content = content.replace(/```([a-z]*)\s*([\s\S]*?)```/g, function(match, lang, code) {
-    if (lang.toLowerCase() === 'json') {
-      return ''; // 移除JSON代码块
-    }
-    return '<pre class="bg-gray-100 dark:bg-gray-800 p-4 rounded-md overflow-x-auto my-2"><code class="language-' + lang + '">' + code + '</code></pre>';
-  });
-
-  // 处理标题 (h1-h3)
-  content = content.replace(/^### (.*?)$/gm, '<h3 class="text-lg font-bold my-2">$1</h3>');
-  content = content.replace(/^## (.*?)$/gm, '<h2 class="text-xl font-bold my-3">$1</h2>');
-  content = content.replace(/^# (.*?)$/gm, '<h1 class="text-2xl font-bold my-4">$1</h1>');
-
-  // 增强数字序号显示效果（仅处理没有空格缩进的一级序号）
-  content = content.replace(/^(\d+)\.\s+(.+)$/gm, function(match, num, text) {
-    // 防止误处理代码示例中的数字点号
-    if (match.trim().startsWith('```') || match.includes('<pre') || match.includes('<code')) {
-      return match;
-    }
-    return `<div class="numbered-item"><span class="number-badge">${num}</span><span class="number-content">${text}</span></div>`;
-  });
-
-  // 处理嵌套的数字序号（有空格缩进的序号）
-  content = content.replace(/^(\s+)(\d+)\.\s+(.+)$/gm, function(match, indent, num, text) {
-    // 防止误处理代码示例中的数字点号
-    if (match.trim().startsWith('```') || match.includes('<pre') || match.includes('<code')) {
-      return match;
-    }
-    return `${indent}<div class="nested-numbered-item"><span class="nested-number-badge">${num}</span><span class="number-content">${text}</span></div>`;
-  });
-
-  // 无序列表处理
-  content = content.replace(/^- (.+)$/gm, '<li class="ml-5 list-disc">$1</li>');
-
-  // 将连续的无序列表项包装在ul标签中
-  content = content.replace(/(<li class="ml-5 list-disc">.*?<\/li>)+/gs, function(match) {
-    return `<ul class="list-disc pl-4 my-2">${match}</ul>`;
-  });
-
-  // 处理引用块
-  content = content.replace(/^> (.+)$/gm, '<blockquote class="border-l-4 border-gray-300 dark:border-gray-600 pl-4 py-1 my-2 text-gray-700 dark:text-gray-300 italic">$1</blockquote>');
-
-  // 转换超链接
-  content = content.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-indigo-600 dark:text-indigo-400 hover:underline">$1</a>');
-
-  // 转换粗体
-  content = content.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-
-  // 转换斜体
-  content = content.replace(/\*([^*]+)\*/g, '<em>$1</em>');
-
-  // 转换行内代码段
-  content = content.replace(/`([^`]+)`/g, '<code class="bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm font-mono">$1</code>');
-
-  // 转换双换行为段落
-  content = content.split(/\n\s*\n/).map(p => {
-    // 跳过已经是HTML标签的内容
-    if (p.startsWith('<h') || p.startsWith('<pre') || p.startsWith('<ul') ||
-        p.startsWith('<blockquote') || p.startsWith('<div class="numbered-item')) {
-      return p;
-    }
-    return `<p>${p}</p>`;
-  }).join('\n\n');
-
-  // 处理段落内的单换行
-  content = content.replace(/([^>])\n([^<])/g, '$1<br>$2');
-
-  return content;
-}
-</script>
 
 <style scoped>
 /* 消息进入动画 */

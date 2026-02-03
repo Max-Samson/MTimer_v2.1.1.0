@@ -1,11 +1,11 @@
 // 使用env.d.ts中定义的全局window.go类型
 // 检查是否处于开发模式，并提供更安全的应用绑定访问
-const isWailsAvailable = typeof window.go !== 'undefined' && window.go?.main?.App;
-const App = isWailsAvailable ? window.go.main.App : null;
+const isWailsAvailable = typeof window.go !== 'undefined' && window.go?.main?.App
+const App = isWailsAvailable ? window.go.main.App : null
 
 // 如果不在Wails环境中，显示警告
 if (!isWailsAvailable) {
-  console.warn('Wails绑定未找到，可能在开发模式下或浏览器环境中');
+  console.warn('Wails绑定未找到，可能在开发模式下或浏览器环境中')
 }
 
 export interface Todo {
@@ -17,7 +17,7 @@ export interface Todo {
   createdAt: number
   completedAt: number | null
   lastFocusTimestamp: number | null
-  mode: "pomodoro" | "custom"
+  mode: 'pomodoro' | 'custom'
   totalFocusTime: number
   completedPomodoros: number
   estimatedPomodoros: number
@@ -131,82 +131,87 @@ export interface GetStatsRequest {
 // 数据库服务类，提供与SQLite数据库的交互方法
 class DatabaseService {
   // 统计数据更新状态管理
-  private isUpdatingStats = false;
-  private lastUpdateTime = 0;
-  private updateStatsDebounceTime = 2000; // 2秒内不重复更新
+  private isUpdatingStats = false
+  private lastUpdateTime = 0
+  private updateStatsDebounceTime = 2000 // 2秒内不重复更新
 
   /**
    * 统一的统计数据更新方法
    * @param force 是否强制更新，绕过防抖
    */
   private async updateStatsIfNeeded(force: boolean = false): Promise<boolean> {
-    const now = Date.now();
-    
+    const now = Date.now()
+
     // 如果正在更新中，等待完成
     if (this.isUpdatingStats) {
-      console.log('[DatabaseService] 统计数据正在更新中，等待完成...');
-      const startWait = Date.now();
+      console.log('[DatabaseService] 统计数据正在更新中，等待完成...')
+      const startWait = Date.now()
       while (this.isUpdatingStats && (Date.now() - startWait < 3000)) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
-      return !this.isUpdatingStats;
+      return !this.isUpdatingStats
     }
 
     // 检查是否需要更新（防抖），如果是强制更新则跳过检查
     if (!force && (now - this.lastUpdateTime < this.updateStatsDebounceTime)) {
-      console.log(`[DatabaseService] 距离上次更新仅${now - this.lastUpdateTime}ms，跳过更新`);
-      return true;
+      console.log(`[DatabaseService] 距离上次更新仅${now - this.lastUpdateTime}ms，跳过更新`)
+      return true
     }
 
     // 执行更新
-    this.isUpdatingStats = true;
-    this.lastUpdateTime = now;
-    
+    this.isUpdatingStats = true
+    this.lastUpdateTime = now
+
     try {
       if (!App) {
-        console.warn('[DatabaseService] App未绑定，无法更新统计数据');
-        return false;
+        console.warn('[DatabaseService] App未绑定，无法更新统计数据')
+        return false
       }
 
-      console.log('[DatabaseService] 开始更新后端统计数据...');
-      const appAny = App as any;
-      await appAny.UpdateStats('');  // 传递空字符串作为date参数
-      console.log('[DatabaseService] 统计数据更新成功');
-      return true;
-    } catch (error) {
-      console.error('[DatabaseService] 更新统计数据失败:', error);
-      return false;
-    } finally {
-      this.isUpdatingStats = false;
+      console.log('[DatabaseService] 开始更新后端统计数据...')
+      const appAny = App as any
+      await appAny.UpdateStats('') // 传递空字符串作为date参数
+      console.log('[DatabaseService] 统计数据更新成功')
+      return true
+    }
+    catch (error) {
+      console.error('[DatabaseService] 更新统计数据失败:', error)
+      return false
+    }
+    finally {
+      this.isUpdatingStats = false
     }
   }
+
   // 获取所有待办事项
   async getAllTodos(): Promise<Todo[]> {
     try {
       // 检查是否处于开发模式
       if (!App) {
-        console.warn('App未绑定，无法获取数据库数据');
-        return []; // 返回空数组而不是模拟数据
+        console.warn('App未绑定，无法获取数据库数据')
+        return [] // 返回空数组而不是模拟数据
       }
 
-      const todos = await App.GetAllTodos();
-      console.log('后端返回的todos数据:', JSON.stringify(todos));
+      const todos = await App.GetAllTodos()
+      console.log('后端返回的todos数据:', JSON.stringify(todos))
       // 转换后端API返回的数据结构为前端使用的Todo结构
       return todos.map((todo: any) => {
         // 确保mode值正确转换
-        let mode: 'pomodoro' | 'custom' = 'pomodoro';
+        let mode: 'pomodoro' | 'custom' = 'pomodoro'
         if (typeof todo.mode === 'string') {
           // 如果是字符串，直接判断
-          mode = todo.mode === 'pomodoro' ? 'pomodoro' : 'custom';
-        } else if (typeof todo.mode === 'number') {
+          mode = todo.mode === 'pomodoro' ? 'pomodoro' : 'custom'
+        }
+        else if (typeof todo.mode === 'number') {
           // 如果是数字，按照约定转换
-          mode = todo.mode === 1 ? 'pomodoro' : 'custom';
-        } else if (todo.mode === true || todo.mode === false) {
+          mode = todo.mode === 1 ? 'pomodoro' : 'custom'
+        }
+        else if (todo.mode === true || todo.mode === false) {
           // 如果是布尔值，true表示番茄模式
-          mode = todo.mode === true ? 'pomodoro' : 'custom';
+          mode = todo.mode === true ? 'pomodoro' : 'custom'
         }
 
-        console.log(`待办事项ID:${todo.todo_id || todo.id}, 名称:${todo.name || todo.text}, 模式:${mode}`);
+        console.log(`待办事项ID:${todo.todo_id || todo.id}, 名称:${todo.name || todo.text}, 模式:${mode}`)
 
         return {
           id: todo.todo_id || todo.id, // 处理字段名差异
@@ -217,16 +222,17 @@ class DatabaseService {
           createdAt: new Date(todo.created_at || Date.now()).getTime(),
           completedAt: todo.completed_at ? new Date(todo.completed_at).getTime() : null,
           lastFocusTimestamp: todo.last_focus_timestamp ? new Date(todo.last_focus_timestamp).getTime() : null,
-          mode: mode, // 使用转换后的模式值
+          mode, // 使用转换后的模式值
           totalFocusTime: todo.total_focus_time || 0,
           completedPomodoros: todo.completed_pomodoros || 0,
           estimatedPomodoros: todo.estimated_pomodoros || 1,
-          targetTime: todo.target_time
-        };
-      });
-    } catch (error) {
-      console.error('获取待办事项失败:', error);
-      return []; // 出错时返回空数组
+          targetTime: todo.target_time,
+        }
+      })
+    }
+    catch (error) {
+      console.error('获取待办事项失败:', error)
+      return [] // 出错时返回空数组
     }
   }
 
@@ -237,23 +243,24 @@ class DatabaseService {
       const req = {
         name: todo.text || todo.name,
         mode: todo.mode || 'pomodoro',
-        estimatedPomodoros: todo.estimatedPomodoros || 1
-      };
+        estimatedPomodoros: todo.estimatedPomodoros || 1,
+      }
 
       if (!App) {
-        console.warn('App未绑定，无法创建待办事项');
-        return -1; // 返回错误标识而不是模拟数据
+        console.warn('App未绑定，无法创建待办事项')
+        return -1 // 返回错误标识而不是模拟数据
       }
 
-      const response = await App.CreateTodo(req);
+      const response = await App.CreateTodo(req)
       if (!response || !response.success) {
-        throw new Error(response?.message || '创建待办事项失败');
+        throw new Error(response?.message || '创建待办事项失败')
       }
 
-      return response.todo?.id || -1;
-    } catch (error) {
-      console.error('创建待办事项失败:', error);
-      throw error;
+      return response.todo?.id || -1
+    }
+    catch (error) {
+      console.error('创建待办事项失败:', error)
+      throw error
     }
   }
 
@@ -262,18 +269,19 @@ class DatabaseService {
     try {
       // 检查是否处于开发模式
       if (!App) {
-        console.warn('App未绑定，无法更新待办事项状态');
-        return false; // 开发模式下直接返回失败
+        console.warn('App未绑定，无法更新待办事项状态')
+        return false // 开发模式下直接返回失败
       }
 
-      const response = await App.UpdateTodoStatus({ id, status });
+      const response = await App.UpdateTodoStatus({ id, status })
       if (!response.success) {
-        throw new Error(response.error);
+        throw new Error(response.error)
       }
-      return true;
-    } catch (error) {
-      console.error('更新待办事项状态失败:', error);
-      return false;
+      return true
+    }
+    catch (error) {
+      console.error('更新待办事项状态失败:', error)
+      return false
     }
   }
 
@@ -281,15 +289,16 @@ class DatabaseService {
   async deleteTodo(id: number): Promise<boolean> {
     try {
       if (!App) {
-        console.warn('App未绑定，无法删除待办事项');
-        return false; // 开发模式下返回失败
+        console.warn('App未绑定，无法删除待办事项')
+        return false // 开发模式下返回失败
       }
 
-      const result = await App.DeleteTodo(id);
-      return !!result; // 确保返回布尔值
-    } catch (error) {
-      console.error('删除待办事项失败:', error);
-      return false;
+      const result = await App.DeleteTodo(id)
+      return !!result // 确保返回布尔值
+    }
+    catch (error) {
+      console.error('删除待办事项失败:', error)
+      return false
     }
   }
 
@@ -297,18 +306,19 @@ class DatabaseService {
   async startFocusSession(todoId: number, mode: 'pomodoro' | 'custom'): Promise<number> {
     try {
       if (!App) {
-        console.warn('App未绑定，无法开始专注会话');
-        return -1; // 返回错误标识
+        console.warn('App未绑定，无法开始专注会话')
+        return -1 // 返回错误标识
       }
 
-      const response = await App.StartFocusSession({ todoId, mode });
+      const response = await App.StartFocusSession({ todoId, mode })
       if (!response || !response.sessionId) {
-        throw new Error(response?.error || '开始会话失败');
+        throw new Error(response?.error || '开始会话失败')
       }
-      return response.sessionId;
-    } catch (error) {
-      console.error('开始专注会话失败:', error);
-      return -1;
+      return response.sessionId
+    }
+    catch (error) {
+      console.error('开始专注会话失败:', error)
+      return -1
     }
   }
 
@@ -316,24 +326,25 @@ class DatabaseService {
   async completeFocusSession(sessionId: number, breakTime: number, duration: number): Promise<boolean> {
     try {
       if (!App) {
-        console.warn('App未绑定，无法完成专注会话');
-        return false; // 返回失败状态
+        console.warn('App未绑定，无法完成专注会话')
+        return false // 返回失败状态
       }
 
       const response = await App.CompleteFocusSession({
         sessionId,
         breakTime,
-        duration
-      });
+        duration,
+      })
 
       if (!response || !response.success) {
-        throw new Error(response?.error || '完成会话失败');
+        throw new Error(response?.error || '完成会话失败')
       }
 
-      return true;
-    } catch (error) {
-      console.error('完成专注会话失败:', error);
-      return false;
+      return true
+    }
+    catch (error) {
+      console.error('完成专注会话失败:', error)
+      return false
     }
   }
 
@@ -342,12 +353,12 @@ class DatabaseService {
     try {
       // 检查是否处于开发模式
       if (!App) {
-        console.warn('开发模式：返回模拟统计数据');
+        console.warn('开发模式：返回模拟统计数据')
 
         // 创建一些模拟的统计数据
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(yesterday.getDate() - 1);
+        const today = new Date()
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
 
         const mockStats: StatResponse[] = [
           {
@@ -360,7 +371,7 @@ class DatabaseService {
             totalFocusMinutes: 155,
             totalBreakMinutes: 30,
             tomatoHarvests: 5,
-            timeRanges: ['9:00-10:30', '14:00-16:00']
+            timeRanges: ['9:00-10:30', '14:00-16:00'],
           },
           {
             date: yesterday.toISOString().split('T')[0],
@@ -372,18 +383,19 @@ class DatabaseService {
             totalFocusMinutes: 100,
             totalBreakMinutes: 20,
             tomatoHarvests: 3,
-            timeRanges: ['10:00-11:30', '15:00-16:00']
-          }
-        ];
+            timeRanges: ['10:00-11:30', '15:00-16:00'],
+          },
+        ]
 
-        return mockStats;
+        return mockStats
       }
 
-      const response = await App.GetStats({ startDate, endDate });
-      return response;
-    } catch (error) {
-      console.error('获取统计数据失败:', error);
-      return [];
+      const response = await App.GetStats({ startDate, endDate })
+      return response
+    }
+    catch (error) {
+      console.error('获取统计数据失败:', error)
+      return []
     }
   }
 
@@ -392,7 +404,7 @@ class DatabaseService {
     try {
       // 检查是否处于开发模式
       if (!App) {
-        console.warn('App未绑定，返回空数据结构');
+        console.warn('App未绑定，返回空数据结构')
         return {
           yesterdayStat: {
             date: '',
@@ -404,23 +416,23 @@ class DatabaseService {
             totalFocusMinutes: 0,
             totalBreakMinutes: 0,
             tomatoHarvests: 0,
-            timeRanges: []
+            timeRanges: [],
           },
-          weekTrend: []
-        };
+          weekTrend: [],
+        }
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded(force);
+      await this.updateStatsIfNeeded(force)
 
       // 获取每日摘要数据
-      console.log('获取每日摘要数据...');
-      const appAny = App as any;
-      const response = await appAny.GetDailySummary();
-      console.log('后端返回的每日摘要数据:', response);
+      console.log('获取每日摘要数据...')
+      const appAny = App as any
+      const response = await appAny.GetDailySummary()
+      console.log('后端返回的每日摘要数据:', response)
 
       if (!response) {
-        console.warn('后端返回的每日摘要数据为空');
+        console.warn('后端返回的每日摘要数据为空')
         return {
           yesterdayStat: {
             date: '',
@@ -432,16 +444,16 @@ class DatabaseService {
             totalFocusMinutes: 0,
             totalBreakMinutes: 0,
             tomatoHarvests: 0,
-            timeRanges: []
+            timeRanges: [],
           },
-          weekTrend: []
-        };
+          weekTrend: [],
+        }
       }
 
       // 确保week_trend数组存在
       if (!response.week_trend || !Array.isArray(response.week_trend)) {
-        console.warn('后端返回的week_trend数据无效或不存在，使用空数组');
-        response.week_trend = [];
+        console.warn('后端返回的week_trend数据无效或不存在，使用空数组')
+        response.week_trend = []
       }
 
       // 处理响应数据，确保格式一致性并处理可能的null值
@@ -454,49 +466,52 @@ class DatabaseService {
           customMinutes: typeof item.custom_minutes === 'number' ? item.custom_minutes : 0,
           pomodoroCount: typeof item.pomodoro_count === 'number' ? item.pomodoro_count : 0,
           tomatoHarvests: typeof item.tomato_harvests === 'number' ? item.tomato_harvests : 0,
-          completedTasks: typeof item.completed_tasks === 'number' ? item.completed_tasks : 0
-        };
+          completedTasks: typeof item.completed_tasks === 'number' ? item.completed_tasks : 0,
+        }
 
-        console.log(`处理周趋势数据: 日期=${convertedData.date}, 专注时长=${convertedData.totalFocusMinutes}分钟, 番茄数=${convertedData.pomodoroCount}, 完成任务=${convertedData.completedTasks}`);
+        console.log(`处理周趋势数据: 日期=${convertedData.date}, 专注时长=${convertedData.totalFocusMinutes}分钟, 番茄数=${convertedData.pomodoroCount}, 完成任务=${convertedData.completedTasks}`)
 
-        return convertedData;
-      });
+        return convertedData
+      })
 
       // 标准化昨日统计数据，同样处理可能的null值
-      const yesterdayStat = response.yesterday_stat ? {
-        date: response.yesterday_stat.date || '',
-        pomodoroCount: typeof response.yesterday_stat.pomodoro_count === 'number' ? response.yesterday_stat.pomodoro_count : 0,
-        customCount: typeof response.yesterday_stat.custom_count === 'number' ? response.yesterday_stat.custom_count : 0,
-        totalFocusSessions: typeof response.yesterday_stat.total_focus_sessions === 'number' ? response.yesterday_stat.total_focus_sessions : 0,
-        pomodoroMinutes: typeof response.yesterday_stat.pomodoro_minutes === 'number' ? response.yesterday_stat.pomodoro_minutes : 0,
-        customMinutes: typeof response.yesterday_stat.custom_minutes === 'number' ? response.yesterday_stat.custom_minutes : 0,
-        totalFocusMinutes: typeof response.yesterday_stat.total_focus_minutes === 'number' ? response.yesterday_stat.total_focus_minutes : 0,
-        totalBreakMinutes: typeof response.yesterday_stat.total_break_minutes === 'number' ? response.yesterday_stat.total_break_minutes : 0,
-        tomatoHarvests: typeof response.yesterday_stat.tomato_harvests === 'number' ? response.yesterday_stat.tomato_harvests : 0,
-        timeRanges: Array.isArray(response.yesterday_stat.time_ranges) ? response.yesterday_stat.time_ranges : []
-      } : {
-        date: '',
-        pomodoroCount: 0,
-        customCount: 0,
-        totalFocusSessions: 0,
-        pomodoroMinutes: 0,
-        customMinutes: 0,
-        totalFocusMinutes: 0,
-        totalBreakMinutes: 0,
-        tomatoHarvests: 0,
-        timeRanges: []
-      };
+      const yesterdayStat = response.yesterday_stat
+        ? {
+            date: response.yesterday_stat.date || '',
+            pomodoroCount: typeof response.yesterday_stat.pomodoro_count === 'number' ? response.yesterday_stat.pomodoro_count : 0,
+            customCount: typeof response.yesterday_stat.custom_count === 'number' ? response.yesterday_stat.custom_count : 0,
+            totalFocusSessions: typeof response.yesterday_stat.total_focus_sessions === 'number' ? response.yesterday_stat.total_focus_sessions : 0,
+            pomodoroMinutes: typeof response.yesterday_stat.pomodoro_minutes === 'number' ? response.yesterday_stat.pomodoro_minutes : 0,
+            customMinutes: typeof response.yesterday_stat.custom_minutes === 'number' ? response.yesterday_stat.custom_minutes : 0,
+            totalFocusMinutes: typeof response.yesterday_stat.total_focus_minutes === 'number' ? response.yesterday_stat.total_focus_minutes : 0,
+            totalBreakMinutes: typeof response.yesterday_stat.total_break_minutes === 'number' ? response.yesterday_stat.total_break_minutes : 0,
+            tomatoHarvests: typeof response.yesterday_stat.tomato_harvests === 'number' ? response.yesterday_stat.tomato_harvests : 0,
+            timeRanges: Array.isArray(response.yesterday_stat.time_ranges) ? response.yesterday_stat.time_ranges : [],
+          }
+        : {
+            date: '',
+            pomodoroCount: 0,
+            customCount: 0,
+            totalFocusSessions: 0,
+            pomodoroMinutes: 0,
+            customMinutes: 0,
+            totalFocusMinutes: 0,
+            totalBreakMinutes: 0,
+            tomatoHarvests: 0,
+            timeRanges: [],
+          }
 
       const result = {
         yesterdayStat,
-        weekTrend
-      };
+        weekTrend,
+      }
 
-      console.log('处理后的每日摘要数据(最终格式):', JSON.stringify(result));
+      console.log('处理后的每日摘要数据(最终格式):', JSON.stringify(result))
 
-      return result;
-    } catch (error) {
-      console.error('获取每日摘要失败:', error);
+      return result
+    }
+    catch (error) {
+      console.error('获取每日摘要失败:', error)
       // 返回空数据结构而不是模拟数据
       return {
         yesterdayStat: {
@@ -509,49 +524,49 @@ class DatabaseService {
           totalFocusMinutes: 0,
           totalBreakMinutes: 0,
           tomatoHarvests: 0,
-          timeRanges: []
+          timeRanges: [],
         },
-        weekTrend: []
-      };
+        weekTrend: [],
+      }
     }
   }
 
   async getEventStats(startDate: string, endDate: string, force: boolean = false): Promise<EventStatsResponse> {
-    console.log(`开始获取事件统计数据，时间范围：${startDate} - ${endDate}, 强制更新: ${force}`);
+    console.log(`开始获取事件统计数据，时间范围：${startDate} - ${endDate}, 强制更新: ${force}`)
 
     try {
       // 确保App已绑定
       if (!App) {
-        console.error('App未绑定，无法获取数据库数据');
+        console.error('App未绑定，无法获取数据库数据')
         return {
           totalEvents: 0,
           completedEvents: 0,
           completionRate: '0%',
-          trendData: []
-        };
+          trendData: [],
+        }
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded(force);
+      await this.updateStatsIfNeeded(force)
 
       // 获取真实数据
-      console.log("从数据库获取事件统计数据...");
+      console.log('从数据库获取事件统计数据...')
       const response = await (App as any).GetEventStats({
         start_date: startDate,
-        end_date: endDate
-      });
-      
-      console.log("GetEventStats API返回结果:", response);
+        end_date: endDate,
+      })
+
+      console.log('GetEventStats API返回结果:', response)
 
       // 确保响应数据有效
       if (!response) {
-        console.warn('后端返回的事件统计数据为空');
+        console.warn('后端返回的事件统计数据为空')
         return {
           totalEvents: 0,
           completedEvents: 0,
           completionRate: '0%',
-          trendData: []
-        };
+          trendData: [],
+        }
       }
 
       // 转换数据格式（如果需要）确保前端接收到的数据格式正确
@@ -562,56 +577,57 @@ class DatabaseService {
         trendData: Array.isArray(response.trend_data)
           ? response.trend_data.map((item: any) => ({
               date: item.date || new Date().toISOString().split('T')[0],
-              totalFocusMinutes: typeof item.total_focus_minutes === 'number' ? item.total_focus_minutes : 0
+              totalFocusMinutes: typeof item.total_focus_minutes === 'number' ? item.total_focus_minutes : 0,
             }))
-          : []
-      };
+          : [],
+      }
 
       // 检查完成率格式 - 确保以百分号结尾
       if (result.completionRate && !result.completionRate.endsWith('%')) {
-        result.completionRate = `${result.completionRate}%`;
+        result.completionRate = `${result.completionRate}%`
       }
 
-      console.log('处理后的事件统计数据:', result);
-      return result;
-    } catch (error) {
-      console.error("获取事件统计数据时出错:", error);
+      console.log('处理后的事件统计数据:', result)
+      return result
+    }
+    catch (error) {
+      console.error('获取事件统计数据时出错:', error)
       return {
         totalEvents: 0,
         completedEvents: 0,
         completionRate: '0%',
-        trendData: []
-      };
+        trendData: [],
+      }
     }
   }
 
   // 获取番茄统计数据
   async getPomodoroStats(startDate: string, endDate: string, force: boolean = false): Promise<PomodoroStatsResponse> {
     try {
-      console.log(`获取番茄统计数据，开始日期: ${startDate}, 结束日期: ${endDate}, 强制更新: ${force}`);
+      console.log(`获取番茄统计数据，开始日期: ${startDate}, 结束日期: ${endDate}, 强制更新: ${force}`)
       // 检查是否处于开发模式
       if (!App) {
-        return this.getEmptyPomodoroStats();
+        return this.getEmptyPomodoroStats()
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded(force);
+      await this.updateStatsIfNeeded(force)
 
       // 请求参数
       const request = {
         start_date: startDate,
-        end_date: endDate
-      };
+        end_date: endDate,
+      }
 
       // 获取番茄统计数据
-      console.log("开始获取番茄统计数据...");
-      const appAny = App as any;
-      const stats = await appAny.GetPomodoroStats(request);
-      console.log("获取到的番茄统计原始数据:", stats);
+      console.log('开始获取番茄统计数据...')
+      const appAny = App as any
+      const stats = await appAny.GetPomodoroStats(request)
+      console.log('获取到的番茄统计原始数据:', stats)
 
       if (!stats) {
-        console.warn("番茄统计数据为空");
-        return this.getEmptyPomodoroStats();
+        console.warn('番茄统计数据为空')
+        return this.getEmptyPomodoroStats()
       }
 
       // 构建返回结果
@@ -627,11 +643,11 @@ class DatabaseService {
           totalFocusMinutes: 0,
           totalBreakMinutes: 0,
           tomatoHarvests: 0,
-          timeRanges: []
+          timeRanges: [],
         },
         trendData: [],
-        timeDistribution: []
-      };
+        timeDistribution: [],
+      }
 
       // 处理最佳日数据
       if (stats.best_day) {
@@ -645,8 +661,8 @@ class DatabaseService {
           totalFocusMinutes: typeof stats.best_day.total_focus_minutes === 'number' ? stats.best_day.total_focus_minutes : 0,
           totalBreakMinutes: typeof stats.best_day.total_break_minutes === 'number' ? stats.best_day.total_break_minutes : 0,
           tomatoHarvests: typeof stats.best_day.tomato_harvests === 'number' ? stats.best_day.tomato_harvests : 0,
-          timeRanges: Array.isArray(stats.best_day.time_ranges) ? stats.best_day.time_ranges : []
-        };
+          timeRanges: Array.isArray(stats.best_day.time_ranges) ? stats.best_day.time_ranges : [],
+        }
       }
 
       // 处理趋势数据
@@ -658,14 +674,14 @@ class DatabaseService {
           customMinutes: typeof item.custom_minutes === 'number' ? item.custom_minutes : 0,
           pomodoroCount: typeof item.pomodoro_count === 'number' ? item.pomodoro_count : 0,
           tomatoHarvests: typeof item.tomato_harvests === 'number' ? item.tomato_harvests : 0,
-          completedTasks: typeof item.completed_tasks === 'number' ? item.completed_tasks : 0
-        }));
+          completedTasks: typeof item.completed_tasks === 'number' ? item.completed_tasks : 0,
+        }))
 
         // 检查并记录转换后的趋势数据
-        console.log('处理后的番茄趋势数据:', JSON.stringify(result.trendData));
-        const hasTomatoHarvests = result.trendData.some(item => (item.tomatoHarvests || 0) > 0);
+        console.log('处理后的番茄趋势数据:', JSON.stringify(result.trendData))
+        const hasTomatoHarvests = result.trendData.some(item => (item.tomatoHarvests || 0) > 0)
         if (!hasTomatoHarvests) {
-          console.warn('番茄收成数据都为0，这是真实的数据状态');
+          console.warn('番茄收成数据都为0，这是真实的数据状态')
         }
       }
 
@@ -673,17 +689,18 @@ class DatabaseService {
       if (Array.isArray(stats.time_distribution)) {
         result.timeDistribution = stats.time_distribution.map((item: any) => ({
           hour: typeof item.hour === 'number' ? item.hour : 0,
-          count: typeof item.count === 'number' ? item.count : 0
-        }));
+          count: typeof item.count === 'number' ? item.count : 0,
+        }))
 
         // 检查时间分布数据
-        console.log('处理后的时间分布数据:', JSON.stringify(result.timeDistribution));
+        console.log('处理后的时间分布数据:', JSON.stringify(result.timeDistribution))
       }
 
-      return result;
-    } catch (error) {
-      console.error('获取番茄统计数据时出错:', error);
-      return this.getEmptyPomodoroStats();
+      return result
+    }
+    catch (error) {
+      console.error('获取番茄统计数据时出错:', error)
+      return this.getEmptyPomodoroStats()
     }
   }
 
@@ -696,8 +713,8 @@ class DatabaseService {
       customMinutes: typeof item.customMinutes === 'number' ? item.customMinutes : 0,
       pomodoroCount: typeof item.pomodoroCount === 'number' ? item.pomodoroCount : 0,
       tomatoHarvests: typeof item.tomatoHarvests === 'number' ? item.tomatoHarvests : 0,
-      completedTasks: typeof item.completedTasks === 'number' ? item.completedTasks : 0
-    };
+      completedTasks: typeof item.completedTasks === 'number' ? item.completedTasks : 0,
+    }
   }
 
   // 获取空的统计数据结构
@@ -714,11 +731,11 @@ class DatabaseService {
         totalFocusMinutes: 0,
         totalBreakMinutes: 0,
         tomatoHarvests: 0,
-        timeRanges: []
+        timeRanges: [],
       },
       trendData: [],
-      timeDistribution: []
-    };
+      timeDistribution: [],
+    }
   }
 
   // 获取统计摘要数据
@@ -726,7 +743,7 @@ class DatabaseService {
     try {
       // 确保App已绑定
       if (!App) {
-        console.error('App未绑定，无法获取数据库数据');
+        console.error('App未绑定，无法获取数据库数据')
         // 返回空数据结构
         return {
           todayCompletedPomodoros: 0,
@@ -734,22 +751,23 @@ class DatabaseService {
           todayFocusTime: 0,
           weekCompletedPomodoros: 0,
           weekCompletedTasks: 0,
-          weekFocusTime: 0
-        };
+          weekFocusTime: 0,
+        }
       }
 
       // 使用统一的更新方法
-      await this.updateStatsIfNeeded(force);
+      await this.updateStatsIfNeeded(force)
 
-      console.log('从数据库获取统计摘要数据');
+      console.log('从数据库获取统计摘要数据')
 
       // 调用后端API
-      const summaryData = await App.GetStatsSummary();
-      console.log('获取到统计摘要数据:', summaryData);
+      const summaryData = await App.GetStatsSummary()
+      console.log('获取到统计摘要数据:', summaryData)
 
-      return summaryData;
-    } catch (error) {
-      console.error('获取统计摘要数据失败:', error);
+      return summaryData
+    }
+    catch (error) {
+      console.error('获取统计摘要数据失败:', error)
       // 返回默认空数据
       return {
         todayCompletedPomodoros: 0,
@@ -757,8 +775,8 @@ class DatabaseService {
         todayFocusTime: 0,
         weekCompletedPomodoros: 0,
         weekCompletedTasks: 0,
-        weekFocusTime: 0
-      };
+        weekFocusTime: 0,
+      }
     }
   }
 }
@@ -766,4 +784,3 @@ class DatabaseService {
 // 创建单例实例
 const dbService = new DatabaseService()
 export default dbService
-

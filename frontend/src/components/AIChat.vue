@@ -1,31 +1,175 @@
+<script setup lang="ts">
+import type { PropType } from 'vue'
+import type { ChatMessage, TaskPlan } from '../services/AIAssistantService'
+import { Bot, Close, Delete, InformationFilled, Send, Settings } from '@vicons/carbon'
+import { Key } from '@vicons/ionicons5'
+import { NButton, NIcon, NInput, NSpin, NTooltip, useMessage } from 'naive-ui'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useSettingsStore } from '../stores'
+import MessageBubble from './chat/MessageBubble.vue'
+import TaskPreview from './chat/TaskPreview.vue'
+
+const props = defineProps({
+  chatHistory: {
+    type: Array as PropType<ChatMessage[]>,
+    default: () => [],
+    required: false,
+  },
+  isLoading: {
+    type: Boolean,
+    default: false,
+    required: false,
+  },
+  chatMode: {
+    type: String,
+    default: 'task',
+    required: false,
+  },
+})
+
+const emit = defineEmits<{
+  (e: 'send-message', message: string): void
+  (e: 'apply-plan', taskPlan: TaskPlan[]): void
+  (e: 'clear-history'): void
+  (e: 'regenerate', messageIndex: number): void
+  (e: 'feedback', messageIndex: number, type: string, value: boolean): void
+  (e: 'open-settings'): void
+}>()
+
+const message = useMessage()
+const router = useRouter()
+const settingsStore = useSettingsStore()
+const inputText = ref('')
+const chatHistoryRef = ref<HTMLElement | null>(null)
+
+// 检查是否有API密钥
+const hasApiKey = computed(() => {
+  return !!settingsStore.aiSettings.apiKey
+})
+
+// 发送消息
+function handleSend() {
+  if (inputText.value.trim() && !props.isLoading) {
+    emit('send-message', inputText.value)
+    inputText.value = ''
+  }
+}
+
+// 监听聊天历史变化，自动滚动到底部
+watch(() => props.chatHistory, async (newValue) => {
+  // 防御性检查，避免undefined引用错误
+  if (!newValue) {
+    return
+  }
+
+  await nextTick()
+  scrollToBottom()
+}, { deep: true })
+
+// 监听加载状态变化，也滚动到底部
+watch(() => props.isLoading, async (newValue) => {
+  if (newValue) {
+    await nextTick()
+    scrollToBottom()
+  }
+})
+
+// 滚动到底部
+function scrollToBottom() {
+  const messageContainer = chatHistoryRef.value
+  if (messageContainer) {
+    messageContainer.scrollTop = messageContainer.scrollHeight
+  }
+}
+
+// 清空输入框
+function clearInput() {
+  inputText.value = ''
+  // 清空后聚焦
+  nextTick(() => {
+    const chatInput = document.querySelector('.chat-input textarea')
+    if (chatInput) {
+      (chatInput as HTMLTextAreaElement).focus()
+    }
+  })
+}
+
+// 重新生成回复
+function regenerateResponse(messageIndex: number) {
+  emit('regenerate', messageIndex)
+}
+
+// 在组件挂载后验证数据
+onMounted(() => {
+  // 如果API密钥未设置，显示提示
+  if (!hasApiKey.value) {
+    message.info('请先配置 AI API 密钥才能使用助手功能')
+  }
+
+  // 为空时自动聚焦输入框
+  const chatInput = document.querySelector('.chat-input textarea')
+  if (chatInput) {
+    (chatInput as HTMLTextAreaElement).focus()
+  }
+
+  // 初始滚动到底部
+  nextTick(() => {
+    scrollToBottom()
+  })
+})
+
+// 示例提示列表
+const examplePrompts = [
+  '我需要复习3小时英语，写2小时论文，如何安排时间？',
+  '帮我制定一个一天的学习计划，包括Java编程和算法设计',
+  '我想在一周内完成一个小型前端项目，如何规划时间？',
+  '如何使用番茄工作法提高工作效率？',
+]
+
+// 使用示例提示
+function useExamplePrompt(prompt: string) {
+  inputText.value = prompt
+  // 自动滚动到输入框
+  nextTick(() => {
+    const chatInput = document.querySelector('.chat-input textarea')
+    if (chatInput) {
+      (chatInput as HTMLTextAreaElement).focus()
+    }
+  })
+}
+</script>
+
 <template>
   <div class="ai-chat-container bg-white dark:bg-gray-800 flex flex-col h-full overflow-hidden rounded-lg shadow-lg transition-all duration-300 border border-gray-200 dark:border-gray-700">
     <!-- API密钥未设置时的提示 -->
     <div v-if="!hasApiKey" class="flex flex-col items-center justify-center p-8 text-center flex-1 animate-fadeIn">
-      <n-icon size="64" class="text-indigo-500 mb-6 animate-pulse">
+      <NIcon size="64" class="text-indigo-500 mb-6 animate-pulse">
         <Key />
-      </n-icon>
-      <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3">未配置 AI API 密钥</h3>
+      </NIcon>
+      <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3">
+        未配置 AI API 密钥
+      </h3>
       <p class="text-gray-600 dark:text-gray-300 mb-6 max-w-md leading-relaxed">
         要使用智能助手功能，您需要配置 API 密钥。
         我们支持 DeepSeek、通义千问、智谱等多种大模型。
       </p>
       <div class="space-y-4 w-full max-w-xs">
-        <n-button type="primary" size="large" class="w-full bg-indigo-500 hover:bg-indigo-600 transition-all duration-300 transform hover:-translate-y-1" @click="$emit('open-settings')">
+        <NButton type="primary" size="large" class="w-full bg-indigo-500 hover:bg-indigo-600 transition-all duration-300 transform hover:-translate-y-1" @click="$emit('open-settings')">
           <template #icon>
-            <n-icon><Settings /></n-icon>
+            <NIcon><Settings /></NIcon>
           </template>
           去配置 API 密钥
-        </n-button>
+        </NButton>
       </div>
     </div>
 
     <template v-else>
       <!-- 消息列表 - 使用固定高度和滚动条 -->
-      <div class="message-list flex-1 overflow-y-auto p-4 min-h-0" ref="chatHistoryRef">
+      <div ref="chatHistoryRef" class="message-list flex-1 overflow-y-auto p-4 min-h-0">
         <!-- 加载状态 - 改进的思考动画 -->
         <div v-if="isLoading" class="thinking-container thinking-container-enhanced flex items-center gap-3 p-4 bg-indigo-50/50 dark:bg-indigo-900/20 rounded-lg my-4 animate-pulse">
-          <n-spin size="small" />
+          <NSpin size="small" />
           <div class="thinking-dots flex gap-1">
             <span class="dot animate-bounce">·</span>
             <span class="dot animate-bounce" style="animation-delay: 0.2s">·</span>
@@ -50,29 +194,33 @@
               <TaskPreview
                 v-if="message.taskData && message.taskData.length > 0 && message.role === 'assistant'"
                 :tasks="message.taskData"
-                @apply="$emit('apply-plan', message.taskData)"
                 class="mt-4 transform transition-all duration-500 animate-fadeIn"
+                @apply="$emit('apply-plan', message.taskData)"
               />
             </div>
             <div v-else class="text-red-500 text-center py-2 rounded bg-red-50 dark:bg-red-900/20">
-              <n-icon class="mr-1"><InformationFilled /></n-icon>
+              <NIcon class="mr-1">
+                <InformationFilled />
+              </NIcon>
               消息无效，请刷新页面
             </div>
           </div>
         </template>
 
         <div v-if="chatHistory && chatHistory.length > 0" class="debug-info text-xs text-gray-400 p-2 mt-2 border-t border-gray-200 dark:border-gray-700">
-          {{chatHistory.length}}条消息，最后更新: {{new Date().toLocaleTimeString()}}
+          {{ chatHistory.length }}条消息，最后更新: {{ new Date().toLocaleTimeString() }}
         </div>
 
         <!-- 欢迎消息 - 更美观的引导提示 -->
         <div v-if="(!chatHistory || chatHistory.length === 0) && !isLoading" class="welcome-container flex flex-col items-center justify-center p-8 text-center">
           <div class="w-20 h-20 rounded-full bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mb-6 animate-pulse">
-            <n-icon size="48" class="text-indigo-500 dark:text-indigo-400">
+            <NIcon size="48" class="text-indigo-500 dark:text-indigo-400">
               <Bot />
-            </n-icon>
+            </NIcon>
           </div>
-          <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-3">欢迎使用AI助手</h3>
+          <h3 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-3">
+            欢迎使用AI助手
+          </h3>
           <p class="text-gray-600 dark:text-gray-400 mb-6 max-w-md">
             描述您的任务需求，AI将为您规划合理的专注时间。您还可以询问任何问题，获取AI的帮助。
           </p>
@@ -84,7 +232,9 @@
               class="example-prompt p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
               @click="useExamplePrompt(prompt)"
             >
-              <p class="text-sm text-gray-700 dark:text-gray-300">{{ prompt }}</p>
+              <p class="text-sm text-gray-700 dark:text-gray-300">
+                {{ prompt }}
+              </p>
             </div>
           </div>
         </div>
@@ -93,209 +243,71 @@
       <!-- 输入区域 - 使用flex-shrink-0确保不被压缩 -->
       <div class="input-area p-4 border-t border-gray-200 dark:border-gray-700 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md flex-shrink-0">
         <div class="input-container relative max-w-4xl mx-auto">
-          <n-input
+          <NInput
             v-model:value="inputText"
             type="textarea"
             :autosize="{ minRows: 1, maxRows: 4 }"
             placeholder="描述你想要完成的任务，或者问任何问题..."
-            @keydown.enter.exact.prevent="handleSend"
             :disabled="isLoading"
             class="chat-input bg-gray-50 dark:bg-gray-700/50 rounded-xl shadow-inner transition-all duration-300 focus-within:ring-2 focus-within:ring-indigo-500/30 dark:focus-within:ring-indigo-400/30"
+            @keydown.enter.exact.prevent="handleSend"
           />
 
           <div class="input-actions flex justify-between items-center mt-3 px-1">
             <div class="input-tools flex items-center gap-2">
-              <n-tooltip trigger="hover" placement="top">
+              <NTooltip trigger="hover" placement="top">
                 <template #trigger>
-                  <n-button circle secondary size="small" class="transition-all duration-300 hover:rotate-90" @click="clearInput">
-                    <template #icon><n-icon><Close /></n-icon></template>
-                  </n-button>
+                  <NButton circle secondary size="small" class="transition-all duration-300 hover:rotate-90" @click="clearInput">
+                    <template #icon>
+                      <NIcon><Close /></NIcon>
+                    </template>
+                  </NButton>
                 </template>
                 <span>清空输入</span>
-              </n-tooltip>
+              </NTooltip>
             </div>
 
             <div class="action-buttons flex space-x-3">
-              <n-button
+              <NButton
                 secondary
                 round
                 size="small"
-                @click="$emit('clear-history')"
                 :disabled="isLoading || chatHistory.length === 0"
                 class="transition-all duration-300 hover:bg-red-50 dark:hover:bg-red-900/20"
+                @click="$emit('clear-history')"
               >
                 <template #icon>
-                  <n-icon><Delete /></n-icon>
+                  <NIcon><Delete /></NIcon>
                 </template>
                 清空对话
-              </n-button>
-              <n-button
+              </NButton>
+              <NButton
                 type="primary"
                 round
                 :disabled="!inputText.trim() || isLoading"
-                @click="handleSend"
                 :loading="isLoading"
                 class="bg-indigo-600 hover:bg-indigo-700 text-white transition-all duration-300 transform hover:scale-105 shadow-md hover:shadow-indigo-500/20"
+                @click="handleSend"
               >
                 <template #icon>
-                  <n-icon><Send /></n-icon>
+                  <NIcon><Send /></NIcon>
                 </template>
                 发送
-              </n-button>
+              </NButton>
             </div>
           </div>
         </div>
 
         <div class="input-hint mt-2 text-xs text-gray-500 dark:text-gray-400 flex items-center">
-          <n-icon size="14" class="mr-1"><InformationFilled /></n-icon>
+          <NIcon size="14" class="mr-1">
+            <InformationFilled />
+          </NIcon>
           <span>提示: 输入你的问题或任务描述，按Enter发送。</span>
         </div>
       </div>
     </template>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, watch, nextTick, computed, onMounted } from 'vue';
-import { Delete, Send, InformationFilled, Bot, Close, Settings } from '@vicons/carbon';
-import { Key } from '@vicons/ionicons5';
-import { ChatMessage, TaskPlan } from '../services/AIAssistantService';
-import MessageBubble from './chat/MessageBubble.vue';
-import TaskPreview from './chat/TaskPreview.vue';
-import { useMessage, NSpin, NIcon, NButton, NTooltip, NInput } from 'naive-ui';
-import { useSettingsStore } from '../stores';
-import { useRouter } from 'vue-router';
-import { PropType } from 'vue';
-
-const props = defineProps({
-  chatHistory: {
-    type: Array as PropType<ChatMessage[]>,
-    default: () => [],
-    required: false
-  },
-  isLoading: {
-    type: Boolean,
-    default: false,
-    required: false
-  },
-  chatMode: {
-    type: String,
-    default: 'task',
-    required: false
-  }
-});
-
-const emit = defineEmits<{
-  (e: 'send-message', message: string): void;
-  (e: 'apply-plan', taskPlan: TaskPlan[]): void;
-  (e: 'clear-history'): void;
-  (e: 'regenerate', messageIndex: number): void;
-  (e: 'feedback', messageIndex: number, type: string, value: boolean): void;
-  (e: 'open-settings'): void;
-}>();
-
-const message = useMessage();
-const router = useRouter();
-const settingsStore = useSettingsStore();
-const inputText = ref('');
-const chatHistoryRef = ref<HTMLElement | null>(null);
-
-// 检查是否有API密钥
-const hasApiKey = computed(() => {
-  return !!settingsStore.aiSettings.apiKey;
-});
-
-// 发送消息
-const handleSend = () => {
-  if (inputText.value.trim() && !props.isLoading) {
-    emit('send-message', inputText.value);
-    inputText.value = '';
-  }
-};
-
-// 监听聊天历史变化，自动滚动到底部
-watch(() => props.chatHistory, async (newValue) => {
-  // 防御性检查，避免undefined引用错误
-  if (!newValue) {
-    return;
-  }
-
-  await nextTick();
-  scrollToBottom();
-}, { deep: true });
-
-// 监听加载状态变化，也滚动到底部
-watch(() => props.isLoading, async (newValue) => {
-  if (newValue) {
-    await nextTick();
-    scrollToBottom();
-  }
-});
-
-// 滚动到底部
-const scrollToBottom = () => {
-  const messageContainer = chatHistoryRef.value;
-  if (messageContainer) {
-    messageContainer.scrollTop = messageContainer.scrollHeight;
-  }
-};
-
-// 清空输入框
-const clearInput = () => {
-  inputText.value = '';
-  // 清空后聚焦
-  nextTick(() => {
-    const chatInput = document.querySelector('.chat-input textarea');
-    if (chatInput) {
-      (chatInput as HTMLTextAreaElement).focus();
-    }
-  });
-};
-
-// 重新生成回复
-const regenerateResponse = (messageIndex: number) => {
-  emit('regenerate', messageIndex);
-};
-
-// 在组件挂载后验证数据
-onMounted(() => {
-  // 如果API密钥未设置，显示提示
-  if (!hasApiKey.value) {
-    message.info('请先配置 AI API 密钥才能使用助手功能');
-  }
-
-  // 为空时自动聚焦输入框
-  const chatInput = document.querySelector('.chat-input textarea');
-  if (chatInput) {
-    (chatInput as HTMLTextAreaElement).focus();
-  }
-
-  // 初始滚动到底部
-  nextTick(() => {
-    scrollToBottom();
-  });
-});
-
-// 示例提示列表
-const examplePrompts = [
-  "我需要复习3小时英语，写2小时论文，如何安排时间？",
-  "帮我制定一个一天的学习计划，包括Java编程和算法设计",
-  "我想在一周内完成一个小型前端项目，如何规划时间？",
-  "如何使用番茄工作法提高工作效率？"
-];
-
-// 使用示例提示
-const useExamplePrompt = (prompt: string) => {
-  inputText.value = prompt;
-  // 自动滚动到输入框
-  nextTick(() => {
-    const chatInput = document.querySelector('.chat-input textarea');
-    if (chatInput) {
-      (chatInput as HTMLTextAreaElement).focus();
-    }
-  });
-};
-</script>
 
 <style scoped>
 .ai-chat-container {
@@ -372,7 +384,9 @@ const useExamplePrompt = (prompt: string) => {
 
 .example-prompt:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 @keyframes fadeIn {

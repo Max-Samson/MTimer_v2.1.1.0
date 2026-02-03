@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { NCard, NForm, NFormItem, NInput, NButton, NSpace, useMessage, NText, NSpin, NDivider, NAlert, NIcon, NTabs, NTabPane, NCollapse, NCollapseItem, NTag } from 'naive-ui'
-import { useSettingsStore } from '../stores'
+import { CheckmarkCircle, CloseCircle, Cloud, ColorPaletteOutline, Key, NotificationsOutline, SettingsOutline } from '@vicons/ionicons5'
+import { NAlert, NButton, NCard, NDivider, NIcon, NInput, NSpin, NTabPane, NTabs, NTag, useMessage } from 'naive-ui'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import AIAssistantService from '../services/AIAssistantService'
-import { Key, Cloud, CheckmarkCircle, CloseCircle, SettingsOutline, ColorPaletteOutline, NotificationsOutline } from '@vicons/ionicons5'
+import { useSettingsStore } from '../stores'
 
 // 使用Pinia store
 const settingsStore = useSettingsStore()
@@ -20,7 +20,7 @@ const activeTab = ref('ai')
 const apiKeyFormState = ref({
   isTestingKey: false,
   testSuccess: false,
-  testError: ''
+  testError: '',
 })
 
 // 从aiSettings中获取API密钥，保持响应性
@@ -28,36 +28,36 @@ const apiKey = computed({
   get: () => aiSettings.value.apiKey,
   set: (value) => {
     settingsStore.updateAISettings({
-      apiKey: value
+      apiKey: value,
     })
     // 重置测试状态
     apiKeyFormState.value.testSuccess = false
     apiKeyFormState.value.testError = ''
-  }
+  },
 })
 
 // 保存设置
-const saveSettings = () => {
+function saveSettings() {
   // 如果API密钥为空，提示用户
   if (!apiKey.value) {
-    message.warning('API密钥不能为空');
-    return;
+    message.warning('API密钥不能为空')
+    return
   }
 
   // 使用store提供的方法保存设置
   settingsStore.updateAISettings({
-    apiKey: apiKey.value
+    apiKey: apiKey.value,
   })
 
   // 同时更新AIAssistantService中的apiKey
   AIAssistantService.setApiKey(apiKey.value)
 
   message.success('设置已保存')
-  console.log('API密钥已保存:', apiKey.value.slice(0, 5) + '******');
+  console.log('API密钥已保存:', `${apiKey.value.slice(0, 5)}******`)
 }
 
 // 测试API密钥
-const testApiKey = async () => {
+async function testApiKey() {
   if (!apiKey.value) {
     message.error('请先输入API密钥')
     return
@@ -69,7 +69,7 @@ const testApiKey = async () => {
   apiKeyFormState.value.isTestingKey = true
 
   try {
-    console.log('开始测试API密钥:', apiKey.value.substring(0, 5) + '...');
+    console.log('开始测试API密钥:', `${apiKey.value.substring(0, 5)}...`)
 
     // 保存API密钥到多个位置
     // 1. 设置到AIAssistantService
@@ -78,10 +78,10 @@ const testApiKey = async () => {
     // 2. 保存到settingsStore
     settingsStore.updateAISettings({
       apiKey: apiKey.value,
-      enabled: true
+      enabled: true,
     })
 
-    console.log('API密钥已保存，正在测试连接...');
+    console.log('API密钥已保存，正在测试连接...')
 
     // 发送一个简单的测试消息
     await AIAssistantService.sendMessage('这是一条测试消息，请简短回复。')
@@ -89,15 +89,17 @@ const testApiKey = async () => {
     // 如果没有报错，测试成功
     apiKeyFormState.value.testSuccess = true
     message.success('API密钥测试成功！连接正常')
-    console.log('API密钥测试成功!');
+    console.log('API密钥测试成功!')
 
     // 测试成功后立即保存设置
-    saveSettings();
-  } catch (error) {
+    saveSettings()
+  }
+  catch (error) {
     console.error('API密钥测试失败:', error)
     apiKeyFormState.value.testError = error instanceof Error ? error.message : '未知错误'
-    message.error('API密钥测试失败: ' + (error instanceof Error ? error.message : '未知错误'))
-  } finally {
+    message.error(`API密钥测试失败: ${error instanceof Error ? error.message : '未知错误'}`)
+  }
+  finally {
     apiKeyFormState.value.isTestingKey = false
   }
 }
@@ -110,13 +112,13 @@ const isAPIKeyValid = computed(() => {
 
 <template>
   <div class="settings-view">
-    <n-card title="设置" class="settings-card" size="large">
+    <NCard title="设置" class="settings-card" size="large">
       <!-- 设置分类标签页 -->
-      <n-tabs v-model:value="activeTab" type="line" animated class="settings-tabs">
-        <n-tab-pane name="ai" tab="AI助手">
+      <NTabs v-model:value="activeTab" type="line" animated class="settings-tabs">
+        <NTabPane name="ai" tab="AI助手">
           <template #tab>
             <div class="tab-item">
-              <n-icon><Cloud /></n-icon>
+              <NIcon><Cloud /></NIcon>
               <span>AI助手</span>
             </div>
           </template>
@@ -125,35 +127,41 @@ const isAPIKeyValid = computed(() => {
           <div class="settings-content">
             <div class="ai-settings-header flex items-center gap-3 mb-6">
               <div class="ai-settings-icon p-3 bg-indigo-50 dark:bg-indigo-900/30 rounded-full">
-                <n-icon size="24" class="text-indigo-500 dark:text-indigo-400">
+                <NIcon size="24" class="text-indigo-500 dark:text-indigo-400">
                   <Cloud />
-                </n-icon>
+                </NIcon>
               </div>
               <div>
-                <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-400 m-0">AI助手设置</h3>
-                <p class="text-sm text-gray-600 dark:text-gray-400 m-0">配置AI助手功能所需的API密钥</p>
+                <h3 class="text-lg font-semibold text-indigo-700 dark:text-indigo-400 m-0">
+                  AI助手设置
+                </h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 m-0">
+                  配置AI助手功能所需的API密钥
+                </p>
               </div>
             </div>
 
-            <n-divider />
+            <NDivider />
 
             <!-- DeepSeek API密钥设置部分 - 简化结构，不使用折叠面板 -->
             <div class="api-key-section mb-6">
               <div class="section-header flex items-center gap-2 mb-4">
-                <n-icon size="18" class="text-indigo-500">
+                <NIcon size="18" class="text-indigo-500">
                   <Key />
-                </n-icon>
+                </NIcon>
                 <span class="text-base font-medium">DeepSeek API密钥配置</span>
-                <n-tag v-if="isAPIKeyValid" type="success" size="small" class="ml-2">已连接</n-tag>
+                <NTag v-if="isAPIKeyValid" type="success" size="small" class="ml-2">
+                  已连接
+                </NTag>
               </div>
 
               <div class="p-2">
                 <div class="api-key-container">
                   <div class="api-guide mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
                     <div class="flex items-start gap-3">
-                      <n-icon size="20" class="text-indigo-500 dark:text-indigo-400 mt-0.5 flex-shrink-0">
+                      <NIcon size="20" class="text-indigo-500 dark:text-indigo-400 mt-0.5 flex-shrink-0">
                         <Key />
-                      </n-icon>
+                      </NIcon>
                       <div>
                         <p class="text-sm text-gray-700 dark:text-gray-300 mb-2">
                           DeepSeek AI是一个强大的大语言模型，可以帮助您规划任务和时间安排。请按照以下步骤获取API密钥：
@@ -169,21 +177,25 @@ const isAPIKeyValid = computed(() => {
                   </div>
 
                   <div class="api-key-form-container">
-                    <n-alert v-if="isAPIKeyValid" type="success" class="mb-4">
+                    <NAlert v-if="isAPIKeyValid" type="success" class="mb-4">
                       <template #icon>
-                        <n-icon><CheckmarkCircle /></n-icon>
+                        <NIcon><CheckmarkCircle /></NIcon>
                       </template>
                       <div class="text-sm">
-                        <div class="font-medium">API密钥有效</div>
-                        <div class="text-gray-600 dark:text-gray-400">AI助手功能已准备就绪，您可以开始使用了！</div>
+                        <div class="font-medium">
+                          API密钥有效
+                        </div>
+                        <div class="text-gray-600 dark:text-gray-400">
+                          AI助手功能已准备就绪，您可以开始使用了！
+                        </div>
                       </div>
-                    </n-alert>
+                    </NAlert>
 
                     <div class="api-key-input-group relative mb-4">
                       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                         API密钥
                       </label>
-                      <n-input
+                      <NInput
                         v-model:value="apiKey"
                         type="password"
                         show-password-on="click"
@@ -194,56 +206,64 @@ const isAPIKeyValid = computed(() => {
                     </div>
 
                     <div class="api-key-actions flex items-center gap-3">
-                      <n-button
+                      <NButton
                         type="primary"
                         ghost
-                        @click="testApiKey"
                         :loading="apiKeyFormState.isTestingKey"
                         :disabled="!apiKey"
                         class="transition-all duration-300 hover:-translate-y-0.5"
                         size="medium"
+                        @click="testApiKey"
                       >
                         <template #icon>
-                          <n-icon>
-                            <n-spin v-if="apiKeyFormState.isTestingKey" />
+                          <NIcon>
+                            <NSpin v-if="apiKeyFormState.isTestingKey" />
                             <Key v-else />
-                          </n-icon>
+                          </NIcon>
                         </template>
                         测试连接
-                      </n-button>
+                      </NButton>
 
-                      <n-button
+                      <NButton
                         type="primary"
-                        @click="saveSettings"
                         :disabled="!apiKey"
                         class="transition-all duration-300 hover:-translate-y-0.5"
                         size="medium"
+                        @click="saveSettings"
                       >
                         <template #icon>
-                          <n-icon><CheckmarkCircle /></n-icon>
+                          <NIcon><CheckmarkCircle /></NIcon>
                         </template>
                         保存设置
-                      </n-button>
+                      </NButton>
                     </div>
 
                     <div v-if="apiKeyFormState.testSuccess" class="key-test-result success mt-4 animate-fadeIn">
                       <div class="flex items-center gap-2">
-                        <n-icon size="20" class="text-green-600 dark:text-green-500">
+                        <NIcon size="20" class="text-green-600 dark:text-green-500">
                           <CheckmarkCircle />
-                        </n-icon>
-                        <p class="font-medium">API密钥验证成功！您现在可以使用AI助手功能了。</p>
+                        </NIcon>
+                        <p class="font-medium">
+                          API密钥验证成功！您现在可以使用AI助手功能了。
+                        </p>
                       </div>
                     </div>
 
                     <div v-if="apiKeyFormState.testError" class="key-test-result error mt-4 animate-fadeIn">
                       <div class="flex items-center gap-2">
-                        <n-icon size="20" class="text-red-600 dark:text-red-500">
+                        <NIcon size="20" class="text-red-600 dark:text-red-500">
                           <CloseCircle />
-                        </n-icon>
+                        </NIcon>
                         <div>
-                          <p class="font-medium">API密钥验证失败</p>
-                          <p class="text-sm">{{ apiKeyFormState.testError }}</p>
-                          <p class="text-sm mt-1">请检查您的API密钥是否正确，或尝试重新生成一个新的密钥。</p>
+                          <p class="font-medium">
+                            API密钥验证失败
+                          </p>
+                          <p class="text-sm">
+                            {{ apiKeyFormState.testError }}
+                          </p>
+                          <p class="text-sm mt-1">
+                            请检查您的API密钥是否正确，或尝试重新生成一个新的密钥。
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -253,9 +273,9 @@ const isAPIKeyValid = computed(() => {
                 <!-- 模型设置 - 简化结构，不使用折叠面板 -->
                 <div class="model-settings-section">
                   <div class="section-header flex items-center gap-2 mb-4">
-                    <n-icon size="18" class="text-indigo-500">
+                    <NIcon size="18" class="text-indigo-500">
                       <SettingsOutline />
-                    </n-icon>
+                    </NIcon>
                     <span class="text-base font-medium">AI模型设置</span>
                   </div>
 
@@ -266,8 +286,12 @@ const isAPIKeyValid = computed(() => {
 
                     <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
                       <div class="flex items-center">
-                        <div class="text-sm font-medium text-gray-700 dark:text-gray-300">当前使用模型</div>
-                        <n-tag class="ml-auto" type="info" size="small">DeepSeek</n-tag>
+                        <div class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          当前使用模型
+                        </div>
+                        <NTag class="ml-auto" type="info" size="small">
+                          DeepSeek
+                        </NTag>
                       </div>
                     </div>
                   </div>
@@ -275,33 +299,33 @@ const isAPIKeyValid = computed(() => {
               </div>
             </div>
           </div>
-        </n-tab-pane>
+        </NTabPane>
 
-        <n-tab-pane name="appearance" tab="外观">
+        <NTabPane name="appearance" tab="外观">
           <template #tab>
             <div class="tab-item">
-              <n-icon><ColorPaletteOutline /></n-icon>
+              <NIcon><ColorPaletteOutline /></NIcon>
               <span>外观</span>
             </div>
           </template>
           <div class="settings-content p-4 text-center text-gray-500">
             <p>主题和外观设置功能即将推出</p>
           </div>
-        </n-tab-pane>
+        </NTabPane>
 
-        <n-tab-pane name="notifications" tab="通知">
+        <NTabPane name="notifications" tab="通知">
           <template #tab>
             <div class="tab-item">
-              <n-icon><NotificationsOutline /></n-icon>
+              <NIcon><NotificationsOutline /></NIcon>
               <span>通知</span>
             </div>
           </template>
           <div class="settings-content p-4 text-center text-gray-500">
             <p>通知设置功能即将推出</p>
           </div>
-        </n-tab-pane>
-      </n-tabs>
-    </n-card>
+        </NTabPane>
+      </NTabs>
+    </NCard>
   </div>
 </template>
 
@@ -317,13 +341,13 @@ const isAPIKeyValid = computed(() => {
   max-width: 100% !important;
 }
 
-:deep(.n-drawer[role="dialog"]) {
+:deep(.n-drawer[role='dialog']) {
   width: 100% !important;
 }
 
-:deep(.n-drawer--right-placement[role="dialog"]),
-:deep(.n-drawer--right-placement[role="dialog"] .n-drawer-content-wrapper),
-:deep(.n-drawer--right-placement[role="dialog"] .n-drawer-content) {
+:deep(.n-drawer--right-placement[role='dialog']),
+:deep(.n-drawer--right-placement[role='dialog'] .n-drawer-content-wrapper),
+:deep(.n-drawer--right-placement[role='dialog'] .n-drawer-content) {
   width: 100% !important;
   max-width: 100% !important;
 }
@@ -340,7 +364,7 @@ const isAPIKeyValid = computed(() => {
   transition: background-color var(--transition-time) ease;
 }
 
-:root[data-theme="dark"] .settings-view {
+:root[data-theme='dark'] .settings-view {
   background-color: rgba(18, 24, 36, 0.7);
   backdrop-filter: blur(10px);
 }
@@ -354,7 +378,7 @@ const isAPIKeyValid = computed(() => {
   transition: all var(--transition-time) ease;
 }
 
-:root[data-theme="dark"] .settings-card {
+:root[data-theme='dark'] .settings-card {
   background-color: rgba(30, 38, 52, 0.8);
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -416,7 +440,8 @@ const isAPIKeyValid = computed(() => {
   margin-bottom: 20px;
 }
 
-.api-key-section, .model-settings-section {
+.api-key-section,
+.model-settings-section {
   background-color: #fff;
   border-radius: 8px;
   transition: all 0.3s ease;
@@ -493,8 +518,14 @@ const isAPIKeyValid = computed(() => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* 适配抽屉样式 */
@@ -579,56 +610,57 @@ const isAPIKeyValid = computed(() => {
   transition: all var(--transition-time) ease;
 }
 
-:root[data-theme="dark"] .ai-settings-header {
+:root[data-theme='dark'] .ai-settings-header {
   background-color: rgba(35, 42, 55, 0.7);
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-:root[data-theme="dark"] .ai-settings-icon {
+:root[data-theme='dark'] .ai-settings-icon {
   background-color: rgba(79, 70, 229, 0.2);
   box-shadow: 0 0 15px rgba(79, 70, 229, 0.3);
 }
 
-:root[data-theme="dark"] .section-header {
+:root[data-theme='dark'] .section-header {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
 /* API密钥设置区域样式 */
-.api-key-section, .model-settings-section {
+.api-key-section,
+.model-settings-section {
   transition: all var(--transition-time) ease;
   border-radius: 12px;
   padding: 20px;
 }
 
-:root[data-theme="dark"] .api-key-section,
-:root[data-theme="dark"] .model-settings-section {
+:root[data-theme='dark'] .api-key-section,
+:root[data-theme='dark'] .model-settings-section {
   background-color: rgba(35, 42, 55, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 /* 输入框样式优化 */
-:root[data-theme="dark"] .api-key-input :deep(.n-input) {
+:root[data-theme='dark'] .api-key-input :deep(.n-input) {
   background-color: rgba(45, 55, 72, 0.7);
   border-color: rgba(255, 255, 255, 0.1);
 }
 
-:root[data-theme="dark"] .api-key-input :deep(.n-input:hover),
-:root[data-theme="dark"] .api-key-input :deep(.n-input:focus) {
+:root[data-theme='dark'] .api-key-input :deep(.n-input:hover),
+:root[data-theme='dark'] .api-key-input :deep(.n-input:focus) {
   border-color: rgba(79, 70, 229, 0.5);
   box-shadow: 0 0 10px rgba(79, 70, 229, 0.2);
 }
 
 /* 按钮样式优化 */
-:root[data-theme="dark"] .api-key-actions :deep(.n-button) {
+:root[data-theme='dark'] .api-key-actions :deep(.n-button) {
   background-color: rgba(79, 70, 229, 0.2);
   border-color: rgba(79, 70, 229, 0.3);
   color: #fff;
 }
 
-:root[data-theme="dark"] .api-key-actions :deep(.n-button:hover) {
+:root[data-theme='dark'] .api-key-actions :deep(.n-button:hover) {
   background-color: rgba(79, 70, 229, 0.3);
   border-color: rgba(79, 70, 229, 0.4);
   box-shadow: 0 0 15px rgba(79, 70, 229, 0.3);
@@ -636,42 +668,42 @@ const isAPIKeyValid = computed(() => {
 }
 
 /* 测试结果样式优化 */
-:root[data-theme="dark"] .key-test-result {
+:root[data-theme='dark'] .key-test-result {
   background-color: rgba(35, 42, 55, 0.7);
   border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-:root[data-theme="dark"] .key-test-result.success {
+:root[data-theme='dark'] .key-test-result.success {
   background-color: rgba(34, 197, 94, 0.2);
   border-color: rgba(34, 197, 94, 0.3);
   color: #4ade80;
 }
 
-:root[data-theme="dark"] .key-test-result.error {
+:root[data-theme='dark'] .key-test-result.error {
   background-color: rgba(239, 68, 68, 0.2);
   border-color: rgba(239, 68, 68, 0.3);
   color: #f87171;
 }
 
 /* 标签页样式优化 */
-:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-nav) {
+:root[data-theme='dark'] .settings-tabs :deep(.n-tabs-nav) {
   background-color: rgba(30, 38, 52, 0.8);
   border-color: rgba(255, 255, 255, 0.05);
 }
 
-:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-tab) {
+:root[data-theme='dark'] .settings-tabs :deep(.n-tabs-tab) {
   color: rgba(255, 255, 255, 0.7);
 }
 
-:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-tab:hover) {
+:root[data-theme='dark'] .settings-tabs :deep(.n-tabs-tab:hover) {
   color: rgba(255, 255, 255, 0.9);
 }
 
-:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-tab--active) {
+:root[data-theme='dark'] .settings-tabs :deep(.n-tabs-tab--active) {
   color: #fff;
 }
 
-:root[data-theme="dark"] .settings-tabs :deep(.n-tabs-nav__bar) {
+:root[data-theme='dark'] .settings-tabs :deep(.n-tabs-nav__bar) {
   background-color: rgb(var(--color-primary));
   box-shadow: 0 0 10px rgba(var(--color-primary), 0.3);
 }
@@ -689,7 +721,7 @@ const isAPIKeyValid = computed(() => {
   }
 }
 
-:root[data-theme="dark"] .ai-settings-icon {
+:root[data-theme='dark'] .ai-settings-icon {
   animation: glow 3s infinite;
 }
 
@@ -704,7 +736,7 @@ const isAPIKeyValid = computed(() => {
     padding: 15px;
   }
 
-  :root[data-theme="dark"] .ai-settings-header {
+  :root[data-theme='dark'] .ai-settings-header {
     padding: 15px;
   }
 }

@@ -1,6 +1,6 @@
 // 使用 env.d.ts 中定义的全局 window.go 类型
-const isWailsAvailable = typeof window.go !== 'undefined' && window.go?.main?.App;
-const App = isWailsAvailable ? window.go.main.App : null;
+const isWailsAvailable = typeof window.go !== 'undefined' && window.go?.main?.App
+const App = isWailsAvailable ? window.go.main.App : null
 
 // 行为特征响应类型
 export interface BehaviorFeature {
@@ -40,7 +40,8 @@ class AICopilotService {
       console.log('[AICopilotService] 行为特征获取成功:', feature)
 
       return feature
-    } catch (error) {
+    }
+    catch (error) {
       console.error('[AICopilotService] 获取行为特征失败:', error)
       return this.getMockBehaviorFeature()
     }
@@ -62,7 +63,8 @@ class AICopilotService {
       console.log('[AICopilotService] 导出成功, 文本长度:', text?.length)
 
       return text
-    } catch (error) {
+    }
+    catch (error) {
       console.error('[AICopilotService] 导出失败:', error)
       return this.getMockExportText()
     }
@@ -87,7 +89,7 @@ class AICopilotService {
       compared_to_avg: 'better',
       compared_to_avg_ratio: 1.15,
       streak_days: 5,
-      best_hour: '09:00-10:00'
+      best_hour: '09:00-10:00',
     }
   }
 

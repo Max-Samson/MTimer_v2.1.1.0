@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 
 // 音频文件路径 - 不使用/前缀，由audioService动态决定路径前缀
 const AUDIO_PATHS = {
@@ -8,8 +8,8 @@ const AUDIO_PATHS = {
   ocean: 'sounds/hildegard_beats__oceano1.m4a',
   piano: 'sounds/josefpres__piano-loops-186-octave-down-long-loop-120-bpm.m4a',
   birds: 'sounds/tobbler__amb_birds_neckar.m4a',
-  chill: 'sounds/zhr__chill-background-music-3.m4a'
-};
+  chill: 'sounds/zhr__chill-background-music-3.m4a',
+}
 
 interface AISettings {
   enabled: boolean
@@ -22,14 +22,14 @@ interface AISettings {
 interface SoundSettings {
   currentSound: string
   autoPlay: boolean
-  localMusicList: Array<{label: string, value: string}>
+  localMusicList: Array<{ label: string, value: string }>
   // 背景音乐设置
   bgMusic: {
     isPlaying: boolean
     currentTrack: string
     volume: number
     currentTime: number
-    playlist: Array<{label: string, value: string}>
+    playlist: Array<{ label: string, value: string }>
   }
 }
 
@@ -40,7 +40,7 @@ export const useSettingsStore = defineStore('settings', () => {
     apiKey: '',
     model: 'deepseek-chat',
     provider: 'deepseek',
-    baseUrl: 'https://api.deepseek.com/v1'
+    baseUrl: 'https://api.deepseek.com/v1',
   })
 
   // 音乐设置
@@ -54,8 +54,8 @@ export const useSettingsStore = defineStore('settings', () => {
       currentTrack: '',
       volume: 0.5,
       currentTime: 0,
-      playlist: []
-    }
+      playlist: [],
+    },
   })
 
   // 可用的音乐列表 - 这个列表用于播放完成音效选择
@@ -171,18 +171,18 @@ export const useSettingsStore = defineStore('settings', () => {
       { label: '钢琴循环', value: AUDIO_PATHS.piano },
       { label: '鸟鸣环境', value: AUDIO_PATHS.birds },
       { label: '轻松背景音乐', value: AUDIO_PATHS.chill },
-    ];
+    ]
 
     // 清空当前播放列表，重新添加，避免重复
-    soundSettings.value.bgMusic.playlist = [...availableBgMusic];
+    soundSettings.value.bgMusic.playlist = [...availableBgMusic]
 
     // 如果播放列表不为空但当前曲目为空，设置第一首为当前曲目
     if (soundSettings.value.bgMusic.playlist.length > 0 && !soundSettings.value.bgMusic.currentTrack) {
-      soundSettings.value.bgMusic.currentTrack = soundSettings.value.bgMusic.playlist[0].value;
+      soundSettings.value.bgMusic.currentTrack = soundSettings.value.bgMusic.playlist[0].value
     }
 
-    console.log('背景音乐播放列表已加载:', soundSettings.value.bgMusic.playlist);
-    saveSoundSettings();
+    console.log('背景音乐播放列表已加载:', soundSettings.value.bgMusic.playlist)
+    saveSoundSettings()
   }
 
   // 添加音乐到背景音乐播放列表
@@ -223,6 +223,6 @@ export const useSettingsStore = defineStore('settings', () => {
     setCurrentBgMusic,
     loadBgMusicPlaylist,
     addToBgMusicPlaylist,
-    removeFromBgMusicPlaylist
+    removeFromBgMusicPlaylist,
   }
 })

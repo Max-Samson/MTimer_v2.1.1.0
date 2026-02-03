@@ -1,3 +1,308 @@
+<script setup lang="ts">
+import type { Ref } from 'vue'
+import type { ChatMode, TaskPlan } from '../services/AIAssistantService'
+import { Bot, Chat, Education, Information, Renew, Save, Settings, Time } from '@vicons/carbon'
+import { NBadge, NButton, NCard, NDropdown, NForm, NFormItem, NIcon, NInput, NModal, NSelect, NSwitch, NTooltip, useMessage } from 'naive-ui'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import AIChat from '../components/AIChat.vue'
+import AIAssistantService from '../services/AIAssistantService'
+import { useSettingsStore } from '../stores'
+
+const message = useMessage()
+const router = useRouter()
+const settingsStore = useSettingsStore()
+
+// 使用try-catch确保即使服务初始化失败也不会导致整个视图崩溃
+let chatHistory: Ref<any[]>
+let isLoading: Ref<boolean>
+let currentMode: Ref<ChatMode>
+const isRefreshing = ref(false)
+
+try {
+  chatHistory = AIAssistantService.getChatHistory()
+  isLoading = AIAssistantService.getLoadingState()
+  currentMode = ref<ChatMode>(AIAssistantService.getCurrentChatMode().value || 'task')
+}
+catch (error) {
+  console.error('获取AI服务数据失败:', error)
+  // 创建默认数据
+  chatHistory = ref([{
+    role: 'assistant',
+    content: '初始化失败，请刷新页面重试。',
+    timestamp: Date.now(),
+  }])
+  isLoading = ref(false)
+  currentMode = ref<ChatMode>('task')
+
+  // 显示错误消息
+  setTimeout(() => {
+    message.error('AI助手初始化失败，请刷新页面重试')
+  }, 500)
+}
+
+const showDebugPanel = ref(false) // 默认不显示调试面板
+const showSettingsModal = ref(false)
+
+// AI 设置表单
+const aiSettingsForm = ref({
+  provider: settingsStore.aiSettings.provider || 'deepseek',
+  model: settingsStore.aiSettings.model || 'deepseek-chat',
+  apiKey: settingsStore.aiSettings.apiKey || '',
+  baseUrl: settingsStore.aiSettings.baseUrl || 'https://api.deepseek.com/v1',
+  enabled: settingsStore.aiSettings.enabled ?? true,
+})
+
+// 服务商选项
+const providerOptions = [
+  { label: 'DeepSeek', value: 'deepseek' },
+  { label: '通义千问 (Qwen)', value: 'qwen' },
+  { label: '智谱 AI (Zhipu)', value: 'zhipu' },
+  { label: 'OpenAI', value: 'openai' },
+  { label: '自定义 (Custom)', value: 'custom' },
+]
+
+// 默认模型和 BaseURL 映射
+const providerDefaults: Record<string, { model: string, baseUrl: string }> = {
+  deepseek: { model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com/v1' },
+  qwen: { model: 'qwen-max', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  zhipu: { model: 'glm-4', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  openai: { model: 'gpt-3.5-turbo', baseUrl: 'https://api.openai.com/v1' },
+  custom: { model: '', baseUrl: '' },
+}
+
+// 监听服务商变化，自动填充默认值
+watch(() => aiSettingsForm.value.provider, (newProvider) => {
+  if (providerDefaults[newProvider]) {
+    aiSettingsForm.value.model = providerDefaults[newProvider].model
+    aiSettingsForm.value.baseUrl = providerDefaults[newProvider].baseUrl
+  }
+})
+
+// 保存设置
+function saveSettings() {
+  settingsStore.updateAISettings({
+    provider: aiSettingsForm.value.provider as any,
+    model: aiSettingsForm.value.model,
+    apiKey: aiSettingsForm.value.apiKey,
+    baseUrl: aiSettingsForm.value.baseUrl,
+    enabled: aiSettingsForm.value.enabled,
+  })
+  AIAssistantService.setApiKey(aiSettingsForm.value.apiKey)
+  showSettingsModal.value = false
+  message.success('AI 设置已保存')
+}
+
+// 检查是否有有效的API密钥
+const hasValidAPI = computed(() => {
+  return !!settingsStore.aiSettings.apiKey
+})
+
+// 模式选项
+const modeOptions = [
+  {
+    label: '任务规划模式',
+    key: 'task',
+    icon: Time,
+  },
+  {
+    label: '日常聊天模式',
+    key: 'chat',
+    icon: Chat,
+  },
+  {
+    label: '学习助手模式',
+    key: 'study',
+    icon: Education,
+  },
+]
+
+// 获取当前模式文本
+function getModeText() {
+  switch (currentMode.value) {
+    case 'task':
+      return '任务规划'
+    case 'chat':
+      return '日常聊天'
+    case 'study':
+      return '学习助手'
+    default:
+      return '任务规划'
+  }
+}
+
+// 切换模式
+function changeMode(key: string | number) {
+  const mode = key as ChatMode
+  if (mode !== currentMode.value) {
+    currentMode.value = mode
+    AIAssistantService.setChatMode(mode)
+    message.success(`已切换到${getModeText()}模式`)
+  }
+}
+
+// 发送消息
+async function sendMessage(input: string) {
+  if (input.trim() === '' || isLoading.value)
+    return
+
+  // 发送消息到AI服务
+  await AIAssistantService.sendMessage(input)
+}
+
+// 应用计划
+async function applyPlan(taskPlan: TaskPlan[]) {
+  message.loading('正在为您创建专注任务...', { duration: 0 })
+  const success = await AIAssistantService.applyTaskPlan(taskPlan)
+
+  // 清除所有消息（主要是上面的loading消息）
+  message.destroyAll()
+
+  if (success) {
+    message.success('计划应用成功！正在前往待办事项页...')
+    // 缩短导航延迟，提升响应感
+    setTimeout(() => {
+      router.push('/todo')
+    }, 800)
+  }
+  else {
+    message.error('应用计划失败，请检查连接或稍后再试')
+  }
+}
+
+// 清空聊天记录
+function clearHistory() {
+  AIAssistantService.clearChatHistory()
+}
+
+// 重新生成回复
+async function regenerateResponse(messageIndex: number) {
+  if (isLoading.value)
+    return
+
+  message.info('正在重新生成回复...')
+
+  try {
+    // 如果需要实现，可以调用AIAssistantService的相应方法
+    // 这里简单实现为直接发送最近一条用户消息
+    const userMessages = chatHistory.value.filter(msg => msg.role === 'user')
+    if (userMessages.length > 0) {
+      const lastUserMessage = userMessages[userMessages.length - 1]
+      await AIAssistantService.sendMessage(lastUserMessage.content)
+    }
+  }
+  catch (error) {
+    message.error('重新生成失败，请稍后再试')
+    console.error('重新生成失败:', error)
+  }
+}
+
+// 处理消息反馈
+function handleFeedback(messageIndex: number, type: string, value: boolean) {
+  // 实际项目中可以发送到后端记录
+  console.log(`消息反馈: 索引=${messageIndex}, 类型=${type}, 值=${value}`)
+
+  if (value) {
+    message.success(`感谢您的${type === 'like' ? '点赞' : '反馈'}！`)
+  }
+}
+
+// 刷新AI对话
+async function refreshAIChat() {
+  if (isLoading.value || isRefreshing.value)
+    return
+
+  isRefreshing.value = true
+  message.info('正在刷新AI对话...')
+
+  try {
+    // 清空聊天历史
+    AIAssistantService.clearChatHistory()
+
+    // 更新视图
+    await nextTick()
+
+    // 提示用户刷新成功
+    message.success('AI对话已重置')
+  }
+  catch (error) {
+    console.error('刷新AI对话失败:', error)
+    message.error('刷新失败，请稍后再试')
+  }
+  finally {
+    // 延迟关闭刷新状态，以便动画效果更明显
+    setTimeout(() => {
+      isRefreshing.value = false
+    }, 800)
+  }
+}
+
+// 刷新视图 (保留但不使用)
+function refreshView() {
+  window.location.reload()
+}
+
+// 在script setup部分添加防御性检查
+const ensuredChatHistory = computed(() => {
+  return chatHistory?.value || []
+})
+
+const ensuredIsLoading = computed(() => {
+  return isLoading?.value || false
+})
+
+onMounted(() => {
+  // 确保AI服务已初始化
+  console.log('正在初始化AI组件...')
+
+  // 初始化聊天历史，如果为空或不存在则创建新的
+  if (!chatHistory?.value || chatHistory.value.length <= 0) {
+    console.log('聊天历史为空，正在初始化...')
+    AIAssistantService.clearChatHistory()
+  }
+
+  // 确保isLoading已初始化
+  if (isLoading?.value === undefined) {
+    console.log('加载状态未定义，设置为false')
+    // 如果isLoading未定义，则尝试重新获取
+    const loadingState = AIAssistantService.getLoadingState()
+    if (loadingState?.value !== undefined) {
+      isLoading = loadingState
+    }
+  }
+
+  // 如果没有API密钥，提示用户设置
+  if (!hasValidAPI.value) {
+    setTimeout(() => {
+      message.warning('请在设置中配置 AI API 密钥以开启智能助手')
+    }, 1000)
+  }
+
+  // 日志输出当前聊天历史状态
+  console.log('AI组件挂载时聊天历史:', {
+    length: ensuredChatHistory.value.length,
+    消息内容示例: ensuredChatHistory.value.slice(-2).map(msg => ({
+      role: msg.role,
+      content: `${msg.content.substring(0, 30)}...`,
+      时间戳: new Date(msg.timestamp).toLocaleTimeString(),
+    })),
+  })
+
+  // 监听聊天历史变化（在组件内部进行调试）
+  watch(() => ensuredChatHistory.value, (newHistory, oldHistory) => {
+    console.log('聊天历史变化:', {
+      oldLength: oldHistory?.length || 0,
+      newLength: newHistory.length,
+      最新消息: newHistory.slice(-1).map(msg => ({
+        role: msg.role,
+        content: `${msg.content.substring(0, 30)}...`,
+        时间戳: new Date(msg.timestamp).toLocaleTimeString(),
+      })),
+    })
+  }, { deep: true })
+})
+</script>
+
 <template>
   <div class="ai-assistant-view flex flex-col h-full w-full bg-gradient-to-br from-gray-50 to-indigo-50/30 dark:from-gray-900 dark:to-indigo-950/30 overflow-hidden transition-colors duration-300">
     <!-- 顶部标题栏 -->
@@ -5,14 +310,14 @@
       <div class="flex justify-between items-center">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-full flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/70 shadow-sm dark:shadow-indigo-500/20">
-            <n-icon size="20" class="text-indigo-500 dark:text-indigo-400">
+            <NIcon size="20" class="text-indigo-500 dark:text-indigo-400">
               <Bot />
-            </n-icon>
+            </NIcon>
           </div>
           <div>
             <h1 class="text-lg font-bold text-gray-900 dark:text-gray-100 m-0 flex items-center gap-2">
               AI 时间专注助手
-              <n-badge dot processing type="success" class="ml-1" v-if="hasValidAPI" />
+              <NBadge v-if="hasValidAPI" dot processing type="success" class="ml-1" />
               <span class="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1 hidden md:inline-block">
                 ({{ settingsStore.aiSettings.provider }}: {{ settingsStore.aiSettings.model }})
               </span>
@@ -20,71 +325,75 @@
           </div>
         </div>
         <div class="flex items-center gap-3">
-          <n-tooltip trigger="hover" placement="bottom">
+          <NTooltip trigger="hover" placement="bottom">
             <template #trigger>
               <div>
-                <n-dropdown
+                <NDropdown
                   :options="modeOptions"
-                  @select="changeMode"
                   trigger="click"
+                  @select="changeMode"
                 >
-                  <n-button
+                  <NButton
                     size="small"
                     class="mode-button bg-gradient-to-r from-indigo-100 to-indigo-50 dark:from-indigo-900/60 dark:to-indigo-800/50 text-indigo-700 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-800/70 border-none shadow-sm hover:shadow transition-all hover:-translate-y-0.5 dark:shadow-indigo-600/10"
                   >
                     <template #icon>
-                      <n-icon size="18" class="animate-pulse-slow">
+                      <NIcon size="18" class="animate-pulse-slow">
                         <Chat v-if="currentMode === 'chat'" />
                         <Time v-else-if="currentMode === 'task'" />
                         <Education v-else-if="currentMode === 'study'" />
-                      </n-icon>
+                      </NIcon>
                     </template>
                     {{ getModeText() }}
-                  </n-button>
-                </n-dropdown>
+                  </NButton>
+                </NDropdown>
               </div>
             </template>
             <span>切换对话模式</span>
-          </n-tooltip>
+          </NTooltip>
 
-          <n-tooltip trigger="hover" placement="bottom">
+          <NTooltip trigger="hover" placement="bottom">
             <template #trigger>
-              <n-button
-                @click="refreshAIChat"
+              <NButton
                 size="small"
                 class="refresh-button bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/40 dark:to-indigo-900/30 text-blue-600 dark:text-blue-300 hover:shadow hover:-translate-y-0.5 transition-all duration-300 dark:shadow-blue-600/10"
+                @click="refreshAIChat"
               >
                 <template #icon>
-                  <n-icon size="18" :class="{'animate-spin-slow': isRefreshing}"><Renew /></n-icon>
+                  <NIcon size="18" :class="{ 'animate-spin-slow': isRefreshing }">
+                    <Renew />
+                  </NIcon>
                 </template>
                 <span class="text-xs ml-1">刷新</span>
-              </n-button>
+              </NButton>
             </template>
             <span>重置AI对话</span>
-          </n-tooltip>
+          </NTooltip>
 
-          <n-tooltip trigger="hover" placement="bottom">
+          <NTooltip trigger="hover" placement="bottom">
             <template #trigger>
-              <n-button
-                @click="showSettingsModal = true"
+              <NButton
                 size="small"
                 class="settings-button bg-gradient-to-r from-teal-50 to-green-50 dark:from-teal-900/40 dark:to-green-900/30 text-teal-600 dark:text-teal-300 hover:shadow hover:-translate-y-0.5 transition-all duration-300 dark:shadow-teal-600/10"
+                @click="showSettingsModal = true"
               >
                 <template #icon>
-                  <n-icon size="18"><Settings /></n-icon>
+                  <NIcon size="18">
+                    <Settings />
+                  </NIcon>
                 </template>
                 <span class="text-xs ml-1">设置</span>
-              </n-button>
+              </NButton>
             </template>
             <span>AI 模型设置</span>
-          </n-tooltip>
+          </NTooltip>
         </div>
       </div>
     </div>
 
     <!-- AI 模型设置模态框 -->
-    <n-modal v-model:show="showSettingsModal" transform-origin="center">
-      <n-card
+    <NModal v-model:show="showSettingsModal" transform-origin="center">
+      <NCard
         style="width: 500px; border-radius: 12px;"
         title="AI 助手大模型设置"
         :bordered="false"
@@ -95,87 +404,99 @@
         @close="showSettingsModal = false"
       >
         <template #header-extra>
-          <n-icon size="24" class="text-indigo-500"><Bot /></n-icon>
+          <NIcon size="24" class="text-indigo-500">
+            <Bot />
+          </NIcon>
         </template>
 
-        <n-form :model="aiSettingsForm" label-placement="left" label-width="100">
-          <n-form-item label="启用 AI">
-            <n-switch v-model:value="aiSettingsForm.enabled" />
-          </n-form-item>
-          
-          <n-form-item label="服务商">
-            <n-select
+        <NForm :model="aiSettingsForm" label-placement="left" label-width="100">
+          <NFormItem label="启用 AI">
+            <NSwitch v-model:value="aiSettingsForm.enabled" />
+          </NFormItem>
+
+          <NFormItem label="服务商">
+            <NSelect
               v-model:value="aiSettingsForm.provider"
               :options="providerOptions"
               placeholder="选择 AI 服务商"
             />
-          </n-form-item>
+          </NFormItem>
 
-          <n-form-item label="API 密钥">
-            <n-input
+          <NFormItem label="API 密钥">
+            <NInput
               v-model:value="aiSettingsForm.apiKey"
               type="password"
               show-password-on="click"
               placeholder="输入您的 API Key"
             />
-          </n-form-item>
+          </NFormItem>
 
-          <n-form-item label="模型名称">
-            <n-input
+          <NFormItem label="模型名称">
+            <NInput
               v-model:value="aiSettingsForm.model"
               placeholder="例如: deepseek-chat, qwen-max"
             />
-          </n-form-item>
+          </NFormItem>
 
-          <n-form-item label="API 地址">
-            <n-input
+          <NFormItem label="API 地址">
+            <NInput
               v-model:value="aiSettingsForm.baseUrl"
               placeholder="API 基础路径 (Base URL)"
             />
             <template #feedback>
               <div class="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                <n-icon size="14"><Information /></n-icon>
+                <NIcon size="14">
+                  <Information />
+                </NIcon>
                 通常以 /v1 结尾
               </div>
             </template>
-          </n-form-item>
-        </n-form>
+          </NFormItem>
+        </NForm>
 
         <template #footer>
           <div class="flex justify-end gap-3">
-            <n-button @click="showSettingsModal = false">取消</n-button>
-            <n-button type="primary" @click="saveSettings" icon-placement="left">
+            <NButton @click="showSettingsModal = false">
+              取消
+            </NButton>
+            <NButton type="primary" icon-placement="left" @click="saveSettings">
               <template #icon>
-                <n-icon><Save /></n-icon>
+                <NIcon><Save /></NIcon>
               </template>
               保存设置
-            </n-button>
+            </NButton>
           </div>
         </template>
-      </n-card>
-    </n-modal>
+      </NCard>
+    </NModal>
 
     <!-- 聊天区域容器 - 固定高度并使用overflow属性 -->
     <div class="chat-container flex-1 px-4 py-2 md:px-6 lg:px-8 overflow-hidden flex flex-col">
       <!-- 调试信息 -->
       <div v-if="showDebugPanel" class="debug-panel p-3 bg-gray-100 dark:bg-gray-800/90 mb-4 rounded text-xs border border-gray-300 dark:border-gray-600/80 flex-shrink-0 dark:shadow-md dark:shadow-gray-900/30">
         <div class="flex justify-between items-center mb-2">
-          <div class="font-bold">AI聊天组件调试面板</div>
-          <n-button size="tiny" @click="showDebugPanel = false">关闭</n-button>
+          <div class="font-bold">
+            AI聊天组件调试面板
+          </div>
+          <NButton size="tiny" @click="showDebugPanel = false">
+            关闭
+          </NButton>
         </div>
         <div class="grid grid-cols-2 gap-2">
-          <div><span class="font-semibold">历史消息数:</span> {{chatHistory?.value?.length || 0}}</div>
-          <div><span class="font-semibold">加载状态:</span> {{isLoading?.value ? '加载中' : '空闲'}}</div>
-          <div><span class="font-semibold">当前模式:</span> {{currentMode}}</div>
-          <div><span class="font-semibold">API密钥:</span> {{hasValidAPI ? '已设置' : '未设置'}}</div>
+          <div><span class="font-semibold">历史消息数:</span> {{ chatHistory?.value?.length || 0 }}</div>
+          <div><span class="font-semibold">加载状态:</span> {{ isLoading?.value ? '加载中' : '空闲' }}</div>
+          <div><span class="font-semibold">当前模式:</span> {{ currentMode }}</div>
+          <div><span class="font-semibold">API密钥:</span> {{ hasValidAPI ? '已设置' : '未设置' }}</div>
         </div>
-        <div class="mt-2 border-t border-gray-300 dark:border-gray-600/80 pt-2" v-if="chatHistory?.value?.length">
-          <div class="font-semibold mb-1">最近消息:</div>
+        <div v-if="chatHistory?.value?.length" class="mt-2 border-t border-gray-300 dark:border-gray-600/80 pt-2">
+          <div class="font-semibold mb-1">
+            最近消息:
+          </div>
           <div class="max-h-20 overflow-y-auto bg-white dark:bg-gray-700/90 p-2 rounded">
             <div v-for="(msg, i) in chatHistory.value.slice(-2)" :key="i" class="mb-1 pb-1 border-b border-dashed border-gray-200 dark:border-gray-600/80">
-              <div><span class="font-semibold">角色:</span> {{msg.role}}</div>
-              <div><span class="font-semibold">内容:</span> {{msg.content.substring(0, 50)}}{{msg.content.length > 50 ? '...' : ''}}</div>
-              <div><span class="font-semibold">时间:</span> {{new Date(msg.timestamp).toLocaleTimeString()}}</div>
+              <div><span class="font-semibold">角色:</span> {{ msg.role }}</div>
+              <div><span class="font-semibold">内容:</span> {{ msg.content.substring(0, 50) }}{{ msg.content.length > 50 ? '...' : '' }}</div>
+              <div><span class="font-semibold">时间:</span> {{ new Date(msg.timestamp).toLocaleTimeString() }}</div>
             </div>
           </div>
         </div>
@@ -187,313 +508,18 @@
           :chat-history="ensuredChatHistory"
           :is-loading="ensuredIsLoading"
           :chat-mode="currentMode"
+          class="animate-fadeIn h-full"
           @send-message="sendMessage"
           @apply-plan="applyPlan"
           @clear-history="clearHistory"
           @regenerate="regenerateResponse"
           @feedback="handleFeedback"
           @open-settings="showSettingsModal = true"
-          class="animate-fadeIn h-full"
         />
       </div>
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, onMounted, computed, watch, Ref, nextTick } from 'vue';
-import { useMessage, NTooltip, NButton, NIcon, NDropdown, NBadge, NModal, NCard, NForm, NFormItem, NInput, NSelect, NSpace, NSwitch } from 'naive-ui';
-import { useRouter } from 'vue-router';
-import { Bot, Reset, Chat, Time, Education, Tools, Renew, Settings, Information, Save, Close, Warning } from '@vicons/carbon';
-import AIAssistantService, { TaskPlan, ChatMode } from '../services/AIAssistantService';
-import AIChat from '../components/AIChat.vue';
-import { useSettingsStore } from '../stores';
-
-const message = useMessage();
-const router = useRouter();
-const settingsStore = useSettingsStore();
-
-// 使用try-catch确保即使服务初始化失败也不会导致整个视图崩溃
-let chatHistory: Ref<any[]>;
-let isLoading: Ref<boolean>;
-let currentMode: Ref<ChatMode>;
-const isRefreshing = ref(false);
-
-try {
-  chatHistory = AIAssistantService.getChatHistory();
-  isLoading = AIAssistantService.getLoadingState();
-  currentMode = ref<ChatMode>(AIAssistantService.getCurrentChatMode().value || 'task');
-} catch (error) {
-  console.error('获取AI服务数据失败:', error);
-  // 创建默认数据
-  chatHistory = ref([{
-    role: 'assistant',
-    content: '初始化失败，请刷新页面重试。',
-    timestamp: Date.now()
-  }]);
-  isLoading = ref(false);
-  currentMode = ref<ChatMode>('task');
-
-  // 显示错误消息
-  setTimeout(() => {
-    message.error('AI助手初始化失败，请刷新页面重试');
-  }, 500);
-}
-
-const showDebugPanel = ref(false); // 默认不显示调试面板
-const showSettingsModal = ref(false);
-
-// AI 设置表单
-const aiSettingsForm = ref({
-  provider: settingsStore.aiSettings.provider || 'deepseek',
-  model: settingsStore.aiSettings.model || 'deepseek-chat',
-  apiKey: settingsStore.aiSettings.apiKey || '',
-  baseUrl: settingsStore.aiSettings.baseUrl || 'https://api.deepseek.com/v1',
-  enabled: settingsStore.aiSettings.enabled ?? true
-});
-
-// 服务商选项
-const providerOptions = [
-  { label: 'DeepSeek', value: 'deepseek' },
-  { label: '通义千问 (Qwen)', value: 'qwen' },
-  { label: '智谱 AI (Zhipu)', value: 'zhipu' },
-  { label: 'OpenAI', value: 'openai' },
-  { label: '自定义 (Custom)', value: 'custom' }
-];
-
-// 默认模型和 BaseURL 映射
-const providerDefaults: Record<string, { model: string, baseUrl: string }> = {
-  deepseek: { model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com/v1' },
-  qwen: { model: 'qwen-max', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
-  zhipu: { model: 'glm-4', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
-  openai: { model: 'gpt-3.5-turbo', baseUrl: 'https://api.openai.com/v1' },
-  custom: { model: '', baseUrl: '' }
-};
-
-// 监听服务商变化，自动填充默认值
-watch(() => aiSettingsForm.value.provider, (newProvider) => {
-  if (providerDefaults[newProvider]) {
-    aiSettingsForm.value.model = providerDefaults[newProvider].model;
-    aiSettingsForm.value.baseUrl = providerDefaults[newProvider].baseUrl;
-  }
-});
-
-// 保存设置
-const saveSettings = () => {
-  settingsStore.updateAISettings({
-    provider: aiSettingsForm.value.provider as any,
-    model: aiSettingsForm.value.model,
-    apiKey: aiSettingsForm.value.apiKey,
-    baseUrl: aiSettingsForm.value.baseUrl,
-    enabled: aiSettingsForm.value.enabled
-  });
-  AIAssistantService.setApiKey(aiSettingsForm.value.apiKey);
-  showSettingsModal.value = false;
-  message.success('AI 设置已保存');
-};
-
-// 检查是否有有效的API密钥
-const hasValidAPI = computed(() => {
-  return !!settingsStore.aiSettings.apiKey;
-});
-
-// 模式选项
-const modeOptions = [
-  {
-    label: '任务规划模式',
-    key: 'task',
-    icon: Time
-  },
-  {
-    label: '日常聊天模式',
-    key: 'chat',
-    icon: Chat
-  },
-  {
-    label: '学习助手模式',
-    key: 'study',
-    icon: Education
-  }
-];
-
-// 获取当前模式文本
-const getModeText = () => {
-  switch (currentMode.value) {
-    case 'task':
-      return '任务规划';
-    case 'chat':
-      return '日常聊天';
-    case 'study':
-      return '学习助手';
-    default:
-      return '任务规划';
-  }
-};
-
-// 切换模式
-const changeMode = (key: string | number) => {
-  const mode = key as ChatMode;
-  if (mode !== currentMode.value) {
-    currentMode.value = mode;
-    AIAssistantService.setChatMode(mode);
-    message.success(`已切换到${getModeText()}模式`);
-  }
-};
-
-// 发送消息
-const sendMessage = async (input: string) => {
-  if (input.trim() === '' || isLoading.value) return;
-
-  // 发送消息到AI服务
-  await AIAssistantService.sendMessage(input);
-};
-
-// 应用计划
-const applyPlan = async (taskPlan: TaskPlan[]) => {
-  message.loading('正在为您创建专注任务...', { duration: 0 });
-  const success = await AIAssistantService.applyTaskPlan(taskPlan);
-
-  // 清除所有消息（主要是上面的loading消息）
-  message.destroyAll();
-
-  if (success) {
-    message.success('计划应用成功！正在前往待办事项页...');
-    // 缩短导航延迟，提升响应感
-    setTimeout(() => {
-      router.push('/todo');
-    }, 800);
-  } else {
-    message.error('应用计划失败，请检查连接或稍后再试');
-  }
-};
-
-// 清空聊天记录
-const clearHistory = () => {
-  AIAssistantService.clearChatHistory();
-};
-
-// 重新生成回复
-const regenerateResponse = async (messageIndex: number) => {
-  if (isLoading.value) return;
-
-  message.info('正在重新生成回复...');
-
-  try {
-    // 如果需要实现，可以调用AIAssistantService的相应方法
-    // 这里简单实现为直接发送最近一条用户消息
-    const userMessages = chatHistory.value.filter(msg => msg.role === 'user');
-    if (userMessages.length > 0) {
-      const lastUserMessage = userMessages[userMessages.length - 1];
-      await AIAssistantService.sendMessage(lastUserMessage.content);
-    }
-  } catch (error) {
-    message.error('重新生成失败，请稍后再试');
-    console.error('重新生成失败:', error);
-  }
-};
-
-// 处理消息反馈
-const handleFeedback = (messageIndex: number, type: string, value: boolean) => {
-  // 实际项目中可以发送到后端记录
-  console.log(`消息反馈: 索引=${messageIndex}, 类型=${type}, 值=${value}`);
-
-  if (value) {
-    message.success(`感谢您的${type === 'like' ? '点赞' : '反馈'}！`);
-  }
-};
-
-// 刷新AI对话
-const refreshAIChat = async () => {
-  if (isLoading.value || isRefreshing.value) return;
-
-  isRefreshing.value = true;
-  message.info('正在刷新AI对话...');
-
-  try {
-    // 清空聊天历史
-    AIAssistantService.clearChatHistory();
-
-    // 更新视图
-    await nextTick();
-
-    // 提示用户刷新成功
-    message.success('AI对话已重置');
-  } catch (error) {
-    console.error('刷新AI对话失败:', error);
-    message.error('刷新失败，请稍后再试');
-  } finally {
-    // 延迟关闭刷新状态，以便动画效果更明显
-    setTimeout(() => {
-      isRefreshing.value = false;
-    }, 800);
-  }
-};
-
-// 刷新视图 (保留但不使用)
-const refreshView = () => {
-  window.location.reload();
-};
-
-// 在script setup部分添加防御性检查
-const ensuredChatHistory = computed(() => {
-  return chatHistory?.value || [];
-});
-
-const ensuredIsLoading = computed(() => {
-  return isLoading?.value || false;
-});
-
-onMounted(() => {
-  // 确保AI服务已初始化
-  console.log("正在初始化AI组件...");
-
-  // 初始化聊天历史，如果为空或不存在则创建新的
-  if (!chatHistory?.value || chatHistory.value.length <= 0) {
-    console.log("聊天历史为空，正在初始化...");
-    AIAssistantService.clearChatHistory();
-  }
-
-  // 确保isLoading已初始化
-  if (isLoading?.value === undefined) {
-    console.log("加载状态未定义，设置为false");
-    // 如果isLoading未定义，则尝试重新获取
-    const loadingState = AIAssistantService.getLoadingState();
-    if (loadingState?.value !== undefined) {
-      isLoading = loadingState;
-    }
-  }
-
-  // 如果没有API密钥，提示用户设置
-  if (!hasValidAPI.value) {
-    setTimeout(() => {
-      message.warning('请在设置中配置 AI API 密钥以开启智能助手');
-    }, 1000);
-  }
-
-  // 日志输出当前聊天历史状态
-  console.log("AI组件挂载时聊天历史:", {
-    length: ensuredChatHistory.value.length,
-    消息内容示例: ensuredChatHistory.value.slice(-2).map(msg => ({
-      role: msg.role,
-      content: msg.content.substring(0, 30) + '...',
-      时间戳: new Date(msg.timestamp).toLocaleTimeString()
-    }))
-  });
-
-  // 监听聊天历史变化（在组件内部进行调试）
-  watch(() => ensuredChatHistory.value, (newHistory, oldHistory) => {
-    console.log("聊天历史变化:", {
-      oldLength: oldHistory?.length || 0,
-      newLength: newHistory.length,
-      最新消息: newHistory.slice(-1).map(msg => ({
-        role: msg.role,
-        content: msg.content.substring(0, 30) + '...',
-        时间戳: new Date(msg.timestamp).toLocaleTimeString()
-      }))
-    });
-  }, { deep: true });
-});
-</script>
 
 <style scoped>
 /* 渐入动画 */
@@ -620,9 +646,13 @@ onMounted(() => {
 }
 
 /* 按钮悬浮效果 */
-.refresh-button:hover, .mode-button:hover, .settings-button:hover {
+.refresh-button:hover,
+.mode-button:hover,
+.settings-button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
 }
 
 /* 优化媒体查询，针对不同屏幕高度调整样式 */

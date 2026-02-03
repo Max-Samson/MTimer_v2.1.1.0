@@ -1,28 +1,101 @@
+<script setup lang="ts">
+import type { TaskPlan } from '../../services/AIAssistantService'
+import { Calendar, CheckmarkFilled, CollapseAll, Document, ExpandAll, Pause, Task, Time } from '@vicons/carbon'
+import { TimeOutline } from '@vicons/ionicons5'
+import { addMinutes, format } from 'date-fns'
+import { NButton, NCard, NIcon, NTable, NTag } from 'naive-ui'
+import { defineEmits, defineProps, ref } from 'vue'
+
+const props = defineProps<{
+  tasks: TaskPlan[]
+}>()
+
+const emit = defineEmits<{
+  (e: 'apply'): void
+}>()
+
+// 展开/折叠状态
+const isExpanded = ref(false)
+// 正在应用状态
+const isApplying = ref(false)
+
+// 格式化专注模式
+function formatMode(mode: string): string {
+  const modeMap: Record<string, string> = {
+    pomodoro: '番茄工作法',
+    deep_work: '深度工作',
+    short_break: '短休息',
+    long_break: '长休息',
+  }
+  return modeMap[mode] || mode
+}
+
+// 获取模式对应的颜色
+function getModeColor(mode: string): { color: string, textColor: string } {
+  const colorMap: Record<string, { color: string, textColor: string }> = {
+    pomodoro: { color: '#e5f6ff', textColor: '#0e7490' }, // 淡蓝色
+    deep_work: { color: '#f0f9ff', textColor: '#0369a1' }, // 深蓝色
+    short_break: { color: '#ecfdf5', textColor: '#059669' }, // 绿色
+    long_break: { color: '#fffbeb', textColor: '#b45309' }, // 橙色
+  }
+  return colorMap[mode] || { color: '#f3f4f6', textColor: '#4b5563' } // 默认灰色
+}
+
+// 计算总专注时间
+function calculateTotalFocusTime(): number {
+  return props.tasks.reduce((total, task) => total + task.focusDuration, 0)
+}
+
+// 格式化预计完成时间
+function formatCompletionTime(): string {
+  const now = new Date()
+  const totalMinutes = props.tasks.reduce((total, task) => {
+    return total + task.focusDuration + task.breakDuration
+  }, 0)
+
+  const completionTime = addMinutes(now, totalMinutes)
+  return format(completionTime, 'HH:mm')
+}
+
+// 处理应用按钮点击
+function handleApply(): void {
+  if (isApplying.value)
+    return
+  isApplying.value = true
+  emit('apply')
+
+  // 8秒后自动重置，防止因为某种原因没有跳转而导致按钮一直处于加载状态
+  setTimeout(() => {
+    isApplying.value = false
+  }, 8000)
+}
+</script>
+
 <template>
   <div class="task-preview rounded-xl bg-gray-50 dark:bg-gray-800 p-3 shadow-sm transition-all duration-300 hover:shadow-md border border-indigo-100 dark:border-indigo-900/30">
     <!-- 标题栏和折叠按钮 -->
     <div class="flex items-center justify-between mb-2">
       <h3 class="text-base font-semibold text-indigo-600 dark:text-indigo-400 flex items-center gap-2">
-        <n-icon size="18" class="text-indigo-500 dark:text-indigo-400">
+        <NIcon size="18" class="text-indigo-500 dark:text-indigo-400">
           <TimeOutline />
-        </n-icon>
-        <span>AI推荐的番茄工作计划 <span class="text-sm font-normal text-gray-500">({{tasks.length}}个任务)</span></span>
+        </NIcon>
+        <span>AI推荐的番茄工作计划 <span class="text-sm font-normal text-gray-500">({{ tasks.length }}个任务)</span></span>
       </h3>
 
       <div class="flex items-center gap-2">
-        <n-button
+        <NButton
           circle
           size="small"
           class="text-gray-500 hover:text-indigo-500 dark:text-gray-400 transition-all duration-300"
-          @click="isExpanded = !isExpanded"
           type="tertiary"
+          @click="isExpanded = !isExpanded"
         >
           <template #icon>
-            <n-icon><ExpandAll v-if="!isExpanded" /><CollapseAll v-else /></n-icon>
+            <NIcon><ExpandAll v-if="!isExpanded" /><CollapseAll v-else /></NIcon>
           </template>
-        </n-button>
+        </NButton>
 
-        <n-button
+        <NButton
           type="primary"
           size="small"
           :loading="isApplying"
@@ -31,70 +104,84 @@
           @click="handleApply"
         >
           <template #icon>
-            <n-icon v-if="!isApplying"><CheckmarkFilled /></n-icon>
+            <NIcon v-if="!isApplying">
+              <CheckmarkFilled />
+            </NIcon>
           </template>
           {{ isApplying ? '正在应用...' : '应用计划' }}
-        </n-button>
+        </NButton>
       </div>
     </div>
 
     <!-- 任务总结信息 -->
     <div class="flex flex-wrap gap-2 mb-2 px-2 py-1.5 bg-indigo-50/50 dark:bg-indigo-900/10 rounded-lg text-sm">
       <div class="flex items-center gap-1">
-        <n-icon size="16" class="text-indigo-500 dark:text-indigo-400"><Time /></n-icon>
+        <NIcon size="16" class="text-indigo-500 dark:text-indigo-400">
+          <Time />
+        </NIcon>
         <span class="font-medium text-gray-600 dark:text-gray-300">总时间:</span>
-        <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{calculateTotalFocusTime()}}分钟</span>
+        <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{ calculateTotalFocusTime() }}分钟</span>
       </div>
       <div class="flex items-center gap-1">
-        <n-icon size="16" class="text-indigo-500 dark:text-indigo-400"><Time /></n-icon>
+        <NIcon size="16" class="text-indigo-500 dark:text-indigo-400">
+          <Time />
+        </NIcon>
         <span class="font-medium text-gray-600 dark:text-gray-300">预计完成:</span>
-        <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{formatCompletionTime()}}</span>
+        <span class="font-semibold text-indigo-600 dark:text-indigo-400">{{ formatCompletionTime() }}</span>
       </div>
     </div>
 
     <!-- 可折叠的详细内容 -->
     <div v-if="isExpanded" class="flex flex-col gap-2 transition-all duration-300">
       <div class="table-container max-h-[150px] overflow-auto">
-        <n-card size="small" class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow transition-all duration-300">
-          <n-table :bordered="false" :single-line="false" size="small">
+        <NCard size="small" class="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow transition-all duration-300">
+          <NTable :bordered="false" :single-line="false" size="small">
             <thead>
               <tr>
-                <th class="text-left text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10">任务名称</th>
-                <th class="text-center text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10 w-24">专注模式</th>
-                <th class="text-center text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10 w-20">专注时长</th>
-                <th class="text-center text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10 w-20">休息时长</th>
+                <th class="text-left text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10">
+                  任务名称
+                </th>
+                <th class="text-center text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10 w-24">
+                  专注模式
+                </th>
+                <th class="text-center text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10 w-20">
+                  专注时长
+                </th>
+                <th class="text-center text-gray-700 dark:text-gray-300 px-3 py-2 bg-gray-100 dark:bg-gray-700/50 sticky top-0 z-10 w-20">
+                  休息时长
+                </th>
               </tr>
             </thead>
             <tbody>
               <tr
                 v-for="(task, index) in tasks"
                 :key="index"
-                class="border-t border-gray-200 dark:border-gray-700 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors duration-200"
-                :class="{ 'animate-slideIn': true }"
+                class="border-t border-gray-200 dark:border-gray-700 hover:bg-indigo-50/50 dark:hover:bg-indigo-900/20 transition-colors duration-200 animate-slideIn"
+
                 :style="{ animationDelay: `${index * 0.1}s` }"
               >
                 <td class="py-1.5 px-3 text-gray-800 dark:text-gray-200">
                   <div class="flex items-center">
-                    <span class="task-number flex-shrink-0 w-6 h-6 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full font-medium text-xs mr-2">{{index + 1}}</span>
-                    <n-icon size="16" class="text-indigo-500 dark:text-indigo-400 mr-1.5 flex-shrink-0">
+                    <span class="task-number flex-shrink-0 w-6 h-6 flex items-center justify-center bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-full font-medium text-xs mr-2">{{ index + 1 }}</span>
+                    <NIcon size="16" class="text-indigo-500 dark:text-indigo-400 mr-1.5 flex-shrink-0">
                       <Calendar v-if="task.mode === 'pomodoro'" />
                       <Task v-else-if="task.mode === 'deep_work'" />
                       <Pause v-else-if="task.mode === 'short_break'" />
                       <Time v-else-if="task.mode === 'long_break'" />
                       <Document v-else />
-                    </n-icon>
+                    </NIcon>
                     <span class="truncate max-w-[120px]" :title="task.name">{{ task.name }}</span>
                   </div>
                 </td>
                 <td class="py-1.5 px-3 text-center text-gray-800 dark:text-gray-200">
-                  <n-tag
+                  <NTag
                     :bordered="false"
                     :color="getModeColor(task.mode)"
                     size="small"
                     class="transition-all duration-300 transform hover:scale-105"
                   >
                     {{ formatMode(task.mode) }}
-                  </n-tag>
+                  </NTag>
                 </td>
                 <td class="py-1.5 px-3 text-center text-indigo-600 dark:text-indigo-400 font-medium">
                   {{ task.focusDuration }}<span class="text-xs ml-0.5 text-gray-500 dark:text-gray-400">分钟</span>
@@ -104,14 +191,14 @@
                 </td>
               </tr>
             </tbody>
-          </n-table>
-        </n-card>
+          </NTable>
+        </NCard>
       </div>
     </div>
 
     <!-- 简洁视图（未展开时显示） -->
     <div v-else class="flex flex-wrap gap-2 transition-all duration-300">
-      <n-tag
+      <NTag
         v-for="(task, index) in tasks"
         :key="index"
         :bordered="false"
@@ -120,88 +207,16 @@
         class="transition-all duration-300 transform hover:scale-105"
       >
         <span class="inline-flex items-center">
-          <span class="tag-number inline-flex items-center justify-center w-5 h-5 bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-medium mr-1.5 shadow-sm">{{index + 1}}</span>
+          <span class="tag-number inline-flex items-center justify-center w-5 h-5 bg-white dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 rounded-full text-xs font-medium mr-1.5 shadow-sm">{{ index + 1 }}</span>
           {{ task.name }} ({{ task.focusDuration }}分钟)
         </span>
-      </n-tag>
+      </NTag>
       <div class="text-xs text-gray-500 dark:text-gray-400 w-full mt-1 text-center cursor-pointer hover:text-indigo-500" @click="isExpanded = true">
         点击展开查看详情...
       </div>
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { defineProps, defineEmits, ref } from 'vue';
-import { format, addMinutes } from 'date-fns';
-import { CheckmarkFilled, Calendar, Document, Time, ExpandAll, CollapseAll, Pause, PlayFilled, Task } from '@vicons/carbon';
-import { TimeOutline } from '@vicons/ionicons5';
-import { TaskPlan } from '../../services/AIAssistantService';
-import { NTable, NCard, NIcon, NButton, NTag } from 'naive-ui';
-
-const props = defineProps<{
-  tasks: TaskPlan[];
-}>();
-
-const emit = defineEmits<{
-  (e: 'apply'): void;
-}>();
-
-// 展开/折叠状态
-const isExpanded = ref(false);
-// 正在应用状态
-const isApplying = ref(false);
-
-// 格式化专注模式
-function formatMode(mode: string): string {
-  const modeMap: Record<string, string> = {
-    'pomodoro': '番茄工作法',
-    'deep_work': '深度工作',
-    'short_break': '短休息',
-    'long_break': '长休息'
-  };
-  return modeMap[mode] || mode;
-}
-
-// 获取模式对应的颜色
-function getModeColor(mode: string): { color: string, textColor: string } {
-  const colorMap: Record<string, { color: string, textColor: string }> = {
-    'pomodoro': { color: '#e5f6ff', textColor: '#0e7490' },      // 淡蓝色
-    'deep_work': { color: '#f0f9ff', textColor: '#0369a1' },     // 深蓝色
-    'short_break': { color: '#ecfdf5', textColor: '#059669' },   // 绿色
-    'long_break': { color: '#fffbeb', textColor: '#b45309' },    // 橙色
-  };
-  return colorMap[mode] || { color: '#f3f4f6', textColor: '#4b5563' }; // 默认灰色
-}
-
-// 计算总专注时间
-function calculateTotalFocusTime(): number {
-  return props.tasks.reduce((total, task) => total + task.focusDuration, 0);
-}
-
-// 格式化预计完成时间
-function formatCompletionTime(): string {
-  const now = new Date();
-  const totalMinutes = props.tasks.reduce((total, task) => {
-    return total + task.focusDuration + task.breakDuration;
-  }, 0);
-
-  const completionTime = addMinutes(now, totalMinutes);
-  return format(completionTime, 'HH:mm');
-}
-
-// 处理应用按钮点击
-function handleApply(): void {
-  if (isApplying.value) return;
-  isApplying.value = true;
-  emit('apply');
-  
-  // 8秒后自动重置，防止因为某种原因没有跳转而导致按钮一直处于加载状态
-  setTimeout(() => {
-    isApplying.value = false;
-  }, 8000);
-}
-</script>
 
 <style scoped>
 .animate-slideIn {
@@ -282,4 +297,3 @@ tr:hover .task-number {
   background-color: rgba(99, 102, 241, 0.2);
 }
 </style>
-

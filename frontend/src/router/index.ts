@@ -4,8 +4,8 @@ import { mainLayoutRoutes } from './layouts'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    ...mainLayoutRoutes
-  ]
+    ...mainLayoutRoutes,
+  ],
 })
 
 export default router

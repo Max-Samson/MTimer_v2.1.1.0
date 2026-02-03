@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, provide, onMounted, watch } from 'vue'
-import { NConfigProvider, darkTheme, useOsTheme, NMessageProvider } from 'naive-ui'
+import { darkTheme, NConfigProvider, NMessageProvider, useOsTheme } from 'naive-ui'
+import { onMounted, provide, ref, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import AudioInitializer from './components/AudioInitializer.vue'
 
@@ -13,7 +13,7 @@ const globalDataState = ref({
   isLoading: false,
   lastRefreshTime: 0,
   hasError: false,
-  errorMessage: ''
+  errorMessage: '',
 })
 
 // 提供全局数据状态管理方法
@@ -36,7 +36,7 @@ provide('getDataState', () => globalDataState.value)
 provide('theme', theme)
 
 // 切换主题的方法
-const toggleTheme = () => {
+function toggleTheme() {
   theme.value = theme.value ? null : darkTheme
   // 保存主题设置到localStorage
   localStorage.setItem('themeMode', theme.value ? 'dark' : 'light')
@@ -47,15 +47,18 @@ const toggleTheme = () => {
     // 使用Wails运行时API设置窗口为暗色主题（仅Windows平台）
     try {
       window.runtime?.WindowSetDarkTheme?.()
-    } catch (e) {
+    }
+    catch (e) {
       console.error('设置系统暗色主题失败', e)
     }
-  } else {
+  }
+  else {
     document.documentElement.setAttribute('data-theme', 'light')
     // 恢复为系统默认主题
     try {
       window.runtime?.WindowSetSystemDefaultTheme?.()
-    } catch (e) {
+    }
+    catch (e) {
       console.error('恢复系统默认主题失败', e)
     }
   }
@@ -73,13 +76,16 @@ onMounted(() => {
     // 使用Wails运行时API设置窗口为暗色主题（仅Windows平台）
     try {
       window.runtime?.WindowSetDarkTheme?.()
-    } catch (e) {
+    }
+    catch (e) {
       console.error('设置系统暗色主题失败', e)
     }
-  } else if (savedTheme === 'light') {
+  }
+  else if (savedTheme === 'light') {
     theme.value = null
     document.documentElement.setAttribute('data-theme', 'light')
-  } else {
+  }
+  else {
     // 如果没有保存的主题设置，则使用系统主题
     const isDark = osThemeRef.value === 'dark'
     theme.value = isDark ? darkTheme : null
@@ -89,7 +95,8 @@ onMounted(() => {
     if (isDark) {
       try {
         window.runtime?.WindowSetDarkTheme?.()
-      } catch (e) {
+      }
+      catch (e) {
         console.error('设置系统暗色主题失败', e)
       }
     }
@@ -108,13 +115,16 @@ watch(osThemeRef, (newValue) => {
     if (isDark) {
       try {
         window.runtime?.WindowSetDarkTheme?.()
-      } catch (e) {
+      }
+      catch (e) {
         console.error('设置系统暗色主题失败', e)
       }
-    } else {
+    }
+    else {
       try {
         window.runtime?.WindowSetSystemDefaultTheme?.()
-      } catch (e) {
+      }
+      catch (e) {
         console.error('恢复系统默认主题失败', e)
       }
     }
@@ -123,13 +133,13 @@ watch(osThemeRef, (newValue) => {
 </script>
 
 <template>
-  <n-config-provider :theme="theme">
-    <n-message-provider>
+  <NConfigProvider :theme="theme">
+    <NMessageProvider>
       <!-- 路由视图 - 所有页面内容将通过路由系统渲染 -->
-      <router-view></router-view>
+      <RouterView />
 
       <!-- 音频服务初始化组件 - 不渲染任何内容，只负责初始化音频服务 -->
-      <audio-initializer />
-    </n-message-provider>
-  </n-config-provider>
+      <AudioInitializer />
+    </NMessageProvider>
+  </NConfigProvider>
 </template>

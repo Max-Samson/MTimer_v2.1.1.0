@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { NModal, NCard, NButton, NIcon, NTimeline, NTimelineItem, NDrawer, NDrawerContent, NDivider, NTag, NSpace } from 'naive-ui'
-import { Information, ChevronRight, Time } from '@vicons/carbon'
+import { ChevronRight, Information, Time } from '@vicons/carbon'
+import { NCard, NDivider, NDrawer, NDrawerContent, NIcon, NSpace, NTag, NTimeline, NTimelineItem } from 'naive-ui'
+import { computed } from 'vue'
 
 // 定义 props 和 emit
 const props = defineProps<{
@@ -15,29 +15,29 @@ const emit = defineEmits<{
 // 计算属性用于绑定到抽屉的show属性
 const drawerShow = computed({
   get: () => props.show,
-  set: (value) => emit('update:show', value)
+  set: value => emit('update:show', value),
 })
 </script>
 
 <template>
-  <n-drawer v-model:show="drawerShow" :width="380" placement="right">
-    <n-drawer-content title="番茄工作法介绍" closable>
+  <NDrawer v-model:show="drawerShow" :width="380" placement="right">
+    <NDrawerContent title="番茄工作法介绍" closable>
       <div class="pomodoro-info">
         <div class="pomodoro-header">
-          <div class="tomato-icon"></div>
+          <div class="tomato-icon" />
           <h2>番茄工作法</h2>
         </div>
 
-        <n-card class="intro-card" size="small">
+        <NCard class="intro-card" size="small">
           <p>番茄工作法是一种简单易行的时间管理方法，由弗朗西斯科·西里洛提出。它通过将工作时间分割成固定的时间段（番茄时间）来提高工作效率和专注度。</p>
-        </n-card>
+        </NCard>
 
-        <n-divider title-placement="left">
-          <n-space align="center">
-            <n-icon><Information /></n-icon>
+        <NDivider title-placement="left">
+          <NSpace align="center">
+            <NIcon><Information /></NIcon>
             <span>基本原则</span>
-          </n-space>
-        </n-divider>
+          </NSpace>
+        </NDivider>
 
         <ul class="principle-list">
           <li>一个番茄时间（25分钟）不可分割，不存在半个或一个半番茄时间</li>
@@ -48,40 +48,48 @@ const drawerShow = computed({
           <li>必须有一份适合自己的作息时间表</li>
         </ul>
 
-        <n-divider title-placement="left">
-          <n-space align="center">
-            <n-icon><ChevronRight /></n-icon>
+        <NDivider title-placement="left">
+          <NSpace align="center">
+            <NIcon><ChevronRight /></NIcon>
             <span>工作步骤</span>
-          </n-space>
-        </n-divider>
+          </NSpace>
+        </NDivider>
 
-        <n-timeline>
-          <n-timeline-item type="success" content="规划今日任务，将任务写在列表里" />
-          <n-timeline-item type="info" content="设定番茄钟（25分钟）" />
-          <n-timeline-item type="warning" content="开始完成第一项任务，直到番茄钟响铃" />
-          <n-timeline-item type="error" content="停止工作，在列表里标记完成记录" />
-          <n-timeline-item type="success" content="休息3~5分钟，活动、喝水、方便等" />
-          <n-timeline-item type="info" content="开始下一个番茄钟，继续任务" />
-          <n-timeline-item type="warning" content="重复上述过程，直到完成任务" />
-          <n-timeline-item type="error" content="每完成四个番茄钟后，休息25分钟" />
-        </n-timeline>
+        <NTimeline>
+          <NTimelineItem type="success" content="规划今日任务，将任务写在列表里" />
+          <NTimelineItem type="info" content="设定番茄钟（25分钟）" />
+          <NTimelineItem type="warning" content="开始完成第一项任务，直到番茄钟响铃" />
+          <NTimelineItem type="error" content="停止工作，在列表里标记完成记录" />
+          <NTimelineItem type="success" content="休息3~5分钟，活动、喝水、方便等" />
+          <NTimelineItem type="info" content="开始下一个番茄钟，继续任务" />
+          <NTimelineItem type="warning" content="重复上述过程，直到完成任务" />
+          <NTimelineItem type="error" content="每完成四个番茄钟后，休息25分钟" />
+        </NTimeline>
 
         <div class="note">
-          <n-divider title-placement="left">
-            <n-space align="center">
-              <n-icon><Time /></n-icon>
+          <NDivider title-placement="left">
+            <NSpace align="center">
+              <NIcon><Time /></NIcon>
               <span>中断处理</span>
-            </n-space>
-          </n-divider>
+            </NSpace>
+          </NDivider>
           <p>在番茄钟过程中，如果突然想起要做其他事情：</p>
           <ul>
-            <li><n-tag type="error" size="small">必须立即处理的事</n-tag>：停止这个番茄钟并宣告它作废，去完成这件事，之后再重新开始同一个番茄钟</li>
-            <li><n-tag type="success" size="small">可以稍后处理的事</n-tag>：在列表里该项任务后面标记一个逗号（表示打扰），将这件事记在"计划外事件"列表里，继续完成当前番茄钟</li>
+            <li>
+              <NTag type="error" size="small">
+                必须立即处理的事
+              </NTag>：停止这个番茄钟并宣告它作废，去完成这件事，之后再重新开始同一个番茄钟
+            </li>
+            <li>
+              <NTag type="success" size="small">
+                可以稍后处理的事
+              </NTag>：在列表里该项任务后面标记一个逗号（表示打扰），将这件事记在"计划外事件"列表里，继续完成当前番茄钟
+            </li>
           </ul>
         </div>
       </div>
-    </n-drawer-content>
-  </n-drawer>
+    </NDrawerContent>
+  </NDrawer>
 </template>
 
 <style scoped>
@@ -102,8 +110,14 @@ const drawerShow = computed({
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .tomato-icon {
@@ -116,10 +130,18 @@ const drawerShow = computed({
 }
 
 @keyframes bounceIn {
-  0% { transform: scale(0); }
-  50% { transform: scale(1.2); }
-  70% { transform: scale(0.9); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(0);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
 }
 
 .pomodoro-header h2 {
@@ -130,8 +152,14 @@ const drawerShow = computed({
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .intro-card {
@@ -139,7 +167,9 @@ const drawerShow = computed({
   background-color: rgba(255, 99, 71, 0.05);
   border-radius: 8px;
   animation: fadeInUp 0.8s ease-in-out;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  transition:
+    transform 0.3s ease,
+    box-shadow 0.3s ease;
 }
 
 .intro-card:hover {
@@ -148,8 +178,14 @@ const drawerShow = computed({
 }
 
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .principle-list {
@@ -167,20 +203,38 @@ const drawerShow = computed({
   animation-fill-mode: both;
 }
 
-.principle-list li:nth-child(1) { animation-delay: 0.1s; }
-.principle-list li:nth-child(2) { animation-delay: 0.2s; }
-.principle-list li:nth-child(3) { animation-delay: 0.3s; }
-.principle-list li:nth-child(4) { animation-delay: 0.4s; }
-.principle-list li:nth-child(5) { animation-delay: 0.5s; }
-.principle-list li:nth-child(6) { animation-delay: 0.6s; }
+.principle-list li:nth-child(1) {
+  animation-delay: 0.1s;
+}
+.principle-list li:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.principle-list li:nth-child(3) {
+  animation-delay: 0.3s;
+}
+.principle-list li:nth-child(4) {
+  animation-delay: 0.4s;
+}
+.principle-list li:nth-child(5) {
+  animation-delay: 0.5s;
+}
+.principle-list li:nth-child(6) {
+  animation-delay: 0.6s;
+}
 
 @keyframes fadeInRight {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .principle-list li::before {
-  content: "•";
+  content: '•';
   color: var(--primary-color, #ff6347);
   font-weight: bold;
   font-size: 1.2rem;
@@ -240,8 +294,14 @@ const drawerShow = computed({
 }
 
 @keyframes slideInUp {
-  from { opacity: 0; transform: translateY(40px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .note p {
@@ -257,13 +317,13 @@ const drawerShow = computed({
   transform: scale(1.02);
 }
 
-:root[data-theme="dark"] .intro-card,
-:root[data-theme="dark"] .note {
+:root[data-theme='dark'] .intro-card,
+:root[data-theme='dark'] .note {
   background-color: rgba(255, 99, 71, 0.1);
 }
 
-:root[data-theme="dark"] .principle-list li:hover,
-:root[data-theme="dark"] .n-timeline-item:hover {
+:root[data-theme='dark'] .principle-list li:hover,
+:root[data-theme='dark'] .n-timeline-item:hover {
   background-color: rgba(255, 99, 71, 0.15);
 }
 
@@ -291,7 +351,13 @@ const drawerShow = computed({
 }
 
 @keyframes slideInFromRight {
-  from { transform: translateX(20px); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style>

@@ -2,7 +2,7 @@
 
 :root {
   /* 基础颜色 */
-  --color-primary: #3A82F6;
+  --color-primary: #3a82f6;
   --color-success: #20bf6b;
   --color-warning: #f39c12;
   --color-danger: #e74c3c;
@@ -13,13 +13,13 @@
   --color-text-primary: #333;
   --color-text-regular: #606266;
   --color-text-secondary: #909399;
-  --color-text-placeholder: #C0C4CC;
+  --color-text-placeholder: #c0c4cc;
 
   /* 边框和背景颜色 */
-  --color-border: #DCDFE6;
-  --color-border-light: #E4E7ED;
-  --color-background: #FFF;
-  --color-background-light: #F5F7FA;
+  --color-border: #dcdfe6;
+  --color-border-light: #e4e7ed;
+  --color-background: #fff;
+  --color-background-light: #f5f7fa;
   --color-background-hover: #f5f7fa;
 
   /* 阴影 */
@@ -42,9 +42,9 @@
 }
 
 /* 暗黑主题变量 */
-:root[data-theme="dark"] {
+:root[data-theme='dark'] {
   /* 暗黑模式基础颜色 - 保持主色调基本不变 */
-  --dark-color-primary: #3A82F6;
+  --dark-color-primary: #3a82f6;
   --dark-color-success: #26de81;
   --dark-color-warning: #f1c40f;
   --dark-color-danger: #e84393;
@@ -52,16 +52,16 @@
   --dark-color-tomato: #ff6b6b;
 
   /* 暗黑模式文本颜色 */
-  --dark-color-text-primary: #E5EAF3;
-  --dark-color-text-regular: #A3ABB2;
+  --dark-color-text-primary: #e5eaf3;
+  --dark-color-text-regular: #a3abb2;
   --dark-color-text-secondary: #909399;
-  --dark-color-text-placeholder: #8C8C8C;
+  --dark-color-text-placeholder: #8c8c8c;
 
   /* 暗黑模式边框和背景颜色 */
-  --dark-color-border: #4C5D7A;
-  --dark-color-border-light: #3A4559;
-  --dark-color-background: #252D3C;
-  --dark-color-background-light: #1E2330;
+  --dark-color-border: #4c5d7a;
+  --dark-color-border-light: #3a4559;
+  --dark-color-background: #252d3c;
+  --dark-color-background-light: #1e2330;
   --dark-color-background-hover: #33415a;
 
   /* 暗黑模式阴影 */
