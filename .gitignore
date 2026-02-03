@@ -136,6 +136,9 @@ secrets/
 
 # .claude
 .claude/
+
+#.agents
+.agents/
 # 大文件提醒（Git LFS候选）
 # 如果添加新媒体文件，请考虑使用 Git LFS
 # 安装: brew install git-lfs && git lfs install
