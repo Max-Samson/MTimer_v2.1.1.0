@@ -162,10 +162,11 @@ onBeforeUnmount(() => {
   }
 })
 
-// 暴露方法给父组件
+// 暴露方法和属性给父组件
 defineExpose({
   resize: resizeChart,
   getInstance: () => chartInstance,
+  chartContainer,
 })
 </script>
 

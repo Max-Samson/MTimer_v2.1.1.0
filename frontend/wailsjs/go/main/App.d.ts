@@ -28,6 +28,8 @@ export function GetStatsSummary():Promise<types.StatSummary>;
 
 export function Greet(arg1:string):Promise<string>;
 
+export function SaveImageFile(arg1:string,arg2:string):Promise<string>;
+
 export function StartFocusSession(arg1:types.StartFocusSessionRequest):Promise<types.StartFocusSessionResponse>;
 
 export function UpdateStats(arg1:string):Promise<types.BasicResponse>;

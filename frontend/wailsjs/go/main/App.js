@@ -54,6 +54,10 @@ export function Greet(arg1) {
   return window['go']['main']['App']['Greet'](arg1);
 }
 
+export function SaveImageFile(arg1, arg2) {
+  return window['go']['main']['App']['SaveImageFile'](arg1, arg2);
+}
+
 export function StartFocusSession(arg1) {
   return window['go']['main']['App']['StartFocusSession'](arg1);
 }

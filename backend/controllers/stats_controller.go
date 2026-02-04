@@ -107,11 +107,11 @@ func (c *StatsController) GetSummary() (*types.StatSummary, error) {
 	today := time.Now().Format("2006-01-02")
 	weekAgo := time.Now().AddDate(0, 0, -7).Format("2006-01-02")
 
-	// 获取今日完成的番茄数（mode = 0表示番茄模式）
+	// 获取今日完成的番茄数（mode = 1表示番茄模式）
 	var todayPomodoros int
 	err := models.DB.QueryRow(`
 		SELECT COUNT(*) FROM focus_sessions
-		WHERE DATE(start_time) = ? AND mode = 0 AND end_time IS NOT NULL
+		WHERE DATE(start_time) = ? AND mode = 1 AND end_time IS NOT NULL
 	`, today).Scan(&todayPomodoros)
 	if err != nil {
 		log.Printf("获取今日番茄数失败: %v", err)
@@ -141,7 +141,7 @@ func (c *StatsController) GetSummary() (*types.StatSummary, error) {
 	var weekPomodoros int
 	err = models.DB.QueryRow(`
 		SELECT COUNT(*) FROM focus_sessions
-		WHERE DATE(start_time) >= ? AND mode = 0 AND end_time IS NOT NULL
+		WHERE DATE(start_time) >= ? AND mode = 1 AND end_time IS NOT NULL
 	`, weekAgo).Scan(&weekPomodoros)
 	if err != nil {
 		log.Printf("获取本周番茄数失败: %v", err)

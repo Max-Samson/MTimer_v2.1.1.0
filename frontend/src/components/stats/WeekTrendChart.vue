@@ -418,6 +418,12 @@ onBeforeUnmount(() => {
   chartInstance?.dispose()
   chartInstance = null
 })
+
+// 暴露图表容器引用给父组件（用于导出功能）
+defineExpose({
+  chartContainer,
+  chartInstance: () => chartInstance,
+})
 </script>
 
 <template>

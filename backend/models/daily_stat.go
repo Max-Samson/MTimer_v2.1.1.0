@@ -120,12 +120,13 @@ func (r *DailyStatRepository) UpdateDailyStats(date string) error {
 		}
 
 		// 根据模式计数和累计分钟数
-		if mode == 0 { // 番茄模式
+		// mode=1 表示番茄模式, mode=2 表示自定义模式
+		if mode == 1 { // 番茄模式
 			pomodoroCount++
 			pomodoroMinutes += duration
 			// 每个番茄钟增加一个番茄收成
 			tomatoHarvests++
-		} else { // 自定义模式
+		} else if mode == 2 { // 自定义模式
 			customCount++
 			customMinutes += duration
 		}

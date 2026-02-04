@@ -823,6 +823,13 @@ onBeforeUnmount(() => {
   pomodoroTrendChartInstance?.dispose()
   timeDistributionChartInstance?.dispose()
 })
+
+// 暴露给父组件（用于导出功能）
+defineExpose({
+  pomodoroTrendChart,
+  timeDistributionChart,
+  stats,
+})
 </script>
 
 <template>

@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"log"
+	"os"
 	"time"
 
 	"MTimer/backend/controllers"
@@ -10,6 +12,8 @@ import (
 	"MTimer/backend/di"
 	"MTimer/backend/models"
 	"MTimer/backend/utils"
+	
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -214,6 +218,60 @@ func (a *App) GetBehaviorFeatures(date string) (*types.BehaviorFeatureResponse, 
 func (a *App) ExportForAI(date string) (string, error) {
 	log.Printf("导出 AI 格式数据, 日期: %s", date)
 	return a.aiCopilotController.ExportForAI(date)
+}
+
+// SaveImageFile 保存图片文件（用于导出图表）
+// 接收 base64 编码的图片数据和建议的文件名
+// 返回保存的文件路径
+func (a *App) SaveImageFile(base64Data string, suggestedFilename string) (string, error) {
+	log.Printf("保存图片文件: %s", suggestedFilename)
+	
+	// 使用 Wails 运行时打开保存文件对话框
+	filePath, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		DefaultFilename: suggestedFilename,
+		Title:           "保存图片",
+		Filters: []runtime.FileFilter{
+			{
+				DisplayName: "PNG 图片 (*.png)",
+				Pattern:     "*.png",
+			},
+		},
+	})
+	
+	if err != nil {
+		log.Printf("打开保存对话框失败: %v", err)
+		return "", err
+	}
+	
+	// 用户取消了保存
+	if filePath == "" {
+		log.Println("用户取消了保存操作")
+		return "", nil
+	}
+	
+	// 解码 base64 数据
+	// 移除 data:image/png;base64, 前缀
+	const prefix = "data:image/png;base64,"
+	if len(base64Data) > len(prefix) && base64Data[:len(prefix)] == prefix {
+		base64Data = base64Data[len(prefix):]
+	}
+	
+	// 解码
+	imageData, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		log.Printf("解码 base64 数据失败: %v", err)
+		return "", err
+	}
+	
+	// 写入文件
+	err = os.WriteFile(filePath, imageData, 0644)
+	if err != nil {
+		log.Printf("写入文件失败: %v", err)
+		return "", err
+	}
+	
+	log.Printf("图片已成功保存到: %s", filePath)
+	return filePath, nil
 }
 
 // repairHistoricalStats 修复历史统计数据

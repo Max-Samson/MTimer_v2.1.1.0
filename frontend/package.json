@@ -22,7 +22,6 @@
     "@vicons/tabler": "^0.13.0",
     "date-fns": "catalog:prod",
     "echarts": "^5.6.0",
-    "file-saver": "^2.0.5",
     "html2canvas": "^1.4.1",
     "mitt": "catalog:prod",
     "naive-ui": "catalog:prod",

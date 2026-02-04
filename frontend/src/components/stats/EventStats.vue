@@ -46,7 +46,7 @@ echarts.use([
 
 // 图表引用
 const completionRateChart = ref<HTMLElement | null>(null)
-const workloadTrendChart = ref<HTMLElement | null>(null)
+const workloadTrendChartRef = ref<any>(null)
 
 // 图表实例
 let completionRateChartInstance: echarts.ECharts | null = null
@@ -173,7 +173,7 @@ function updateChartsTheme() {
   if (workloadTrendChartInstance) {
     workloadTrendChartInstance.dispose()
     workloadTrendChartInstance = null
-    if (workloadTrendChart.value && stats.trendData && stats.trendData.length > 0) {
+    if (workloadTrendChartRef.value?.chartContainer && stats.trendData && stats.trendData.length > 0) {
       initWorkloadTrendChart()
     }
   }
@@ -456,6 +456,13 @@ onBeforeUnmount(() => {
   setGlobalError?.('')
 })
 
+// 暴露给父组件（用于导出功能）
+defineExpose({
+  completionRateChart,
+  workloadTrendChart: workloadTrendChartRef,
+  stats,
+})
+
 // 初始化和刷新图表
 function refreshCharts() {
   console.log('强制刷新图表')
@@ -499,7 +506,7 @@ function refreshCharts() {
     }
 
     // 强制初始化趋势图表
-    if (workloadTrendChart.value && stats.trendData && stats.trendData.length > 0) {
+    if (workloadTrendChartRef.value?.chartContainer && stats.trendData && stats.trendData.length > 0) {
       try {
         console.log('初始化趋势图表')
         initWorkloadTrendChart()
@@ -643,7 +650,7 @@ function initCompletionRateChart() {
 
 // 初始化工作量趋势图
 function initWorkloadTrendChart() {
-  if (!workloadTrendChart.value) {
+  if (!workloadTrendChartRef.value?.chartContainer) {
     console.warn('找不到工作量趋势图表DOM元素')
     return
   }
@@ -663,7 +670,7 @@ function initWorkloadTrendChart() {
     }
 
     console.log('开始初始化工作量趋势图')
-    workloadTrendChartInstance = echarts.init(workloadTrendChart.value)
+    workloadTrendChartInstance = echarts.init(workloadTrendChartRef.value.chartContainer)
 
     // 设置选项并渲染
     workloadTrendChartInstance.setOption(getTrendChartOption())
@@ -789,6 +796,7 @@ function initWorkloadTrendChart() {
           </h4>
           <BaseChart
             v-if="stats.trendData && stats.trendData.length > 0"
+            ref="workloadTrendChartRef"
             :option="getTrendChartOption()"
             :loading="loading"
             :is-empty="!stats.trendData || stats.trendData.length === 0"

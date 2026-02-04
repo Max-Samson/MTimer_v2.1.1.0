@@ -202,6 +202,16 @@ onBeforeUnmount(() => {
   // 取消事件订阅
   eventBus.off(EventNames.STATS_UPDATED, handleStatsUpdated)
 })
+
+// 引用 WeekTrendChart 子组件
+const weekTrendChartRef = ref<InstanceType<typeof WeekTrendChart> | null>(null)
+
+// 暴露给父组件（用于导出功能）
+defineExpose({
+  weekTrendChartRef,
+  summary,
+  weekTrend,
+})
 </script>
 
 <template>
@@ -274,7 +284,7 @@ onBeforeUnmount(() => {
       <div class="section-title">
         本周趋势
       </div>
-      <WeekTrendChart :week-data="weekTrend" />
+      <WeekTrendChart ref="weekTrendChartRef" :week-data="weekTrend" />
     </div>
   </div>
 </template>
