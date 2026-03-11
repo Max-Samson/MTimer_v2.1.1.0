@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TimerMode } from '../stores/timerStore'
 import type { TimerSettings, Todo, TodoStatus } from '../stores/todoStore'
-import { CaretDown, CaretUp, Checkmark, CheckmarkOutline, Edit, PlayFilled, Time, TrashCan } from '@vicons/carbon'
+import { CaretDown, CaretUp, Checkmark, CheckmarkOutline, Edit, PlayFilled, Search, Time, TrashCan } from '@vicons/carbon'
 import {
   NButton,
   NButtonGroup,
@@ -39,6 +39,8 @@ const { todos, currentTodo, dailyCompletedTodos, monthlyCompletedTodos } = store
 const { time, isRunning, currentMode, customWorkTime, customShortBreakTime, customLongBreakTime } = storeToRefs(timerStore)
 const newTodo = ref('')
 const completedCount = ref(0)
+const searchKeyword = ref('') // 搜索输入框的值
+const activeSearchKeyword = ref('') // 实际用于过滤的搜索关键词
 
 // 编辑相关状态
 const showEditModal = ref(false)
@@ -106,6 +108,18 @@ async function initData() {
     message.error('获取待办事项失败')
   }
 }
+
+// 触发搜索
+function triggerSearch() {
+  activeSearchKeyword.value = searchKeyword.value.trim()
+}
+
+// 监听搜索框的变化,如果清空了输入框,则自动清除搜索结果
+watch(searchKeyword, (newValue) => {
+  if (!newValue.trim()) {
+    activeSearchKeyword.value = ''
+  }
+})
 
 // 添加新待办事项
 function addTodo() {
@@ -687,6 +701,15 @@ const filteredTodos = computed(() => {
       result = [...todos.value]
   }
 
+  // 如果有搜索关键词,进行搜索过滤
+  if (activeSearchKeyword.value) {
+    const keyword = activeSearchKeyword.value.toLowerCase()
+    result = result.filter((todo) => {
+      const name = (todo.name || todo.text || '').toLowerCase()
+      return name.includes(keyword)
+    })
+  }
+
   // 按照创建时间倒序排列，最新创建的显示在前面
   return result.sort((a, b) => b.createdAt - a.createdAt)
 })
@@ -822,19 +845,40 @@ function updateEstimatedTimeDisplay() {
         </div>
       </template>
 
-      <!-- 添加待办事项输入框 -->
-      <div class="add-todo">
-        <NInput
-          v-model:value="newTodo" type="text" placeholder="添加新的待办事项..." class="todo-input"
-          @keyup.enter="addTodo"
-        />
-        <NButton circle class="add-btn" :disabled="!newTodo.trim()" @click="addTodo">
-          <template #icon>
-            <NIcon>
-              <Checkmark />
-            </NIcon>
-          </template>
-        </NButton>
+      <!-- 搜索和添加待办事项输入框 -->
+      <div class="todo-input-row">
+        <!-- 添加待办事项 -->
+        <div class="add-todo">
+          <NInput
+            v-model:value="newTodo" type="text" placeholder="添加新的待办事项..." class="todo-input"
+            @keyup.enter="addTodo"
+          />
+          <NButton circle class="add-btn" :disabled="!newTodo.trim()" @click="addTodo">
+            <template #icon>
+              <NIcon>
+                <Checkmark />
+              </NIcon>
+            </template>
+          </NButton>
+        </div>
+
+         <!-- 搜索待办事项 -->
+        <div class="search-todo">
+          <NInput
+            v-model:value="searchKeyword"
+            type="text"
+            placeholder="搜索待办事项..."
+            class="search-input"
+            @keyup.enter="triggerSearch"
+          />
+          <NButton circle class="search-btn" :disabled="!searchKeyword.trim()" @click="triggerSearch">
+            <template #icon>
+              <NIcon>
+                <Search />
+              </NIcon>
+            </template>
+          </NButton>
+        </div>
       </div>
 
       <!-- 待办事项状态分类标签页 -->
@@ -1298,10 +1342,48 @@ function updateEstimatedTimeDisplay() {
   transition: color var(--transition-time) ease;
 }
 
-.add-todo {
+.todo-input-row {
   margin-bottom: 16px;
   display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-todo {
+  flex: 1;
+  display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.search-input {
+  flex-grow: 1;
+  font-size: 0.95rem;
+  transition: all var(--transition-time) ease;
+}
+
+.search-btn {
+  transition: all 0.3s ease;
+  background-color: #2196f3;
+  color: white;
+  flex-shrink: 0;
+}
+
+.search-btn:hover:not(:disabled) {
+  transform: scale(1.1);
+  background-color: #1976d2;
+}
+
+.search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.add-todo {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .todo-input {
@@ -1314,11 +1396,17 @@ function updateEstimatedTimeDisplay() {
   transition: all 0.3s ease;
   background-color: #4caf50;
   color: white;
+  flex-shrink: 0;
 }
 
-.add-btn:hover {
+.add-btn:hover:not(:disabled) {
   transform: scale(1.1);
   background-color: #45a049;
+}
+
+.add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .todo-items {
