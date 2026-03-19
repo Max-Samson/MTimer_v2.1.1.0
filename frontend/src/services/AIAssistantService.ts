@@ -206,12 +206,20 @@ class AIAssistantServiceClass {
       this.saveChatHistoryToStorage()
     }
     catch (error) {
-      console.error('Error calling DeepSeek API:', error)
+      console.error('Error calling AI API:', error)
+
+      // 提取错误信息
+      let errorMessage = '抱歉，我在处理您的请求时遇到了问题。'
+      if (error instanceof Error) {
+        errorMessage = `连接失败: ${error.message}`
+      } else if (typeof error === 'string') {
+        errorMessage = `连接失败: ${error}`
+      }
 
       // 添加错误消息
       this.chatHistory.value.push({
         role: 'assistant',
-        content: '抱歉，我在处理您的请求时遇到了问题。请再试一次。',
+        content: `${errorMessage}\n\n请检查以下内容：\n1. API 地址是否正确（应该包含完整的端点路径）\n2. API 密钥是否有效\n3. 网络连接是否正常\n4. 服务商是否支持该模型`,
         timestamp: Date.now(),
       })
 
@@ -377,7 +385,7 @@ class AIAssistantServiceClass {
         console.log('API响应成功:', apiResponse ? '有数据' : '无数据')
 
         if (!apiResponse || !apiResponse.choices || apiResponse.choices.length === 0) {
-          throw new Error('API返回了空响应')
+          throw new Error('API 返回了空响应，请检查 API 配置是否正确')
         }
 
         // 提取响应内容
@@ -437,17 +445,33 @@ class AIAssistantServiceClass {
         }
       }
       catch (error) {
-        console.error('调用DeepSeek API失败:', error)
-
-        // 发生错误时使用备用模拟响应
-        return this.getFallbackResponse(this.currentChatMode.value, userMessage, image)
+        console.error('调用 AI API 失败:', error)
+        
+        // 提取错误信息
+        let errorMessage = '连接 AI 服务失败'
+        if (error instanceof Error) {
+          errorMessage = error.message
+        } else if (typeof error === 'string') {
+          errorMessage = error
+        }
+        
+        // 抛出错误，让外层处理
+        throw new Error(errorMessage)
       }
     }
     catch (error) {
-      console.error('调用DeepSeek API失败:', error)
-
-      // 发生错误时使用备用模拟响应
-      return this.getFallbackResponse(this.currentChatMode.value, userMessage, image)
+      console.error('准备 AI API 请求失败:', error)
+      
+      // 提取错误信息
+      let errorMessage = '准备 AI 请求失败'
+      if (error instanceof Error) {
+        errorMessage = error.message
+      } else if (typeof error === 'string') {
+        errorMessage = error
+      }
+      
+      // 抛出错误，让外层处理
+      throw new Error(errorMessage)
     }
   }
 

@@ -50,15 +50,23 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	// 使用Base URL，优先使用请求中的Base URL
 	apiBaseURL := c.apiBaseURL
 	if req.BaseURL != "" {
+		originalURL := req.BaseURL
 		apiBaseURL = req.BaseURL
-		// 确保 URL 以 /v1/chat/completions 结尾，或者直接使用提供的完整 URL
-		if !strings.HasSuffix(apiBaseURL, "/chat/completions") {
+		// 用户输入的 BaseURL 应该直接使用，不做任何修改
+		// 如果用户输入的是 /v1 结尾，自动添加 /chat/completions
+		if strings.HasSuffix(apiBaseURL, "/v1") || strings.HasSuffix(apiBaseURL, "/v1/") {
 			if strings.HasSuffix(apiBaseURL, "/") {
 				apiBaseURL += "chat/completions"
 			} else {
 				apiBaseURL += "/chat/completions"
 			}
+			logger.WithFields(map[string]interface{}{
+				"original_url": originalURL,
+				"final_url":    apiBaseURL,
+			}).Info("自动添加 /chat/completions 到 API URL")
 		}
+		// 如果已经包含 chat/completions，直接使用
+		// 否则保持用户输入的原样
 	}
 	logger.WithFields(map[string]interface{}{
 		"url":   apiBaseURL,
@@ -74,9 +82,9 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	// 准备请求数据
 	// 创建新的请求对象，不包含ApiKey和BaseURL字段，因为它们是给后端用的
 	apiReq := struct {
-		Model    string            `json:"model"`
+		Model    string                  `json:"model"`
 		Messages []types.DeepSeekMessage `json:"messages"`
-		Stream   bool              `json:"stream"`
+		Stream   bool                    `json:"stream"`
 	}{
 		Model:    req.Model,
 		Messages: req.Messages,
@@ -102,7 +110,15 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		logger.WithError(err).Error("发送 AI API 请求失败")
-		return nil, fmt.Errorf("发送请求失败: %v", err)
+		// 提供更友好的错误提示
+		if strings.Contains(err.Error(), "no such host") {
+			return nil, fmt.Errorf("无法连接到 AI 服务器，请检查 API 地址是否正确: %s", apiBaseURL)
+		} else if strings.Contains(err.Error(), "connection refused") {
+			return nil, fmt.Errorf("AI 服务器拒绝连接，请检查 API 地址和网络连接: %s", apiBaseURL)
+		} else if strings.Contains(err.Error(), "timeout") {
+			return nil, fmt.Errorf("连接 AI 服务器超时，请检查网络连接")
+		}
+		return nil, fmt.Errorf("连接 AI 服务失败: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -113,7 +129,22 @@ func (c *AIController) CallDeepSeekAPI(req types.DeepSeekAPIRequest) (*types.Dee
 			"status": resp.StatusCode,
 			"body":   string(body),
 		}).Error("AI API 返回错误状态码")
-		return nil, fmt.Errorf("API请求失败，状态码: %d, 错误: %s", resp.StatusCode, string(body))
+
+		// 根据不同的状态码提供友好的错误提示
+		switch resp.StatusCode {
+		case http.StatusUnauthorized:
+			return nil, fmt.Errorf("API 密钥验证失败（401），请检查您的 API 密钥是否正确")
+		case http.StatusForbidden:
+			return nil, fmt.Errorf("访问被拒绝（403），请检查 API 密钥权限")
+		case http.StatusNotFound:
+			return nil, fmt.Errorf("API 地址不存在（404），请检查 API 地址是否正确: %s", apiBaseURL)
+		case http.StatusTooManyRequests:
+			return nil, fmt.Errorf("请求过于频繁（429），请稍后再试")
+		case http.StatusInternalServerError:
+			return nil, fmt.Errorf("AI 服务器内部错误（500），请稍后再试")
+		default:
+			return nil, fmt.Errorf("API 请求失败（状态码: %d），错误信息: %s", resp.StatusCode, string(body))
+		}
 	}
 
 	// 解析响应

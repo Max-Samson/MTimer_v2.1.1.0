@@ -444,11 +444,18 @@ onMounted(() => {
               placeholder="API 基础路径 (Base URL)"
             />
             <template #feedback>
-              <div class="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                <NIcon size="14">
-                  <Information />
-                </NIcon>
-                通常以 /v1 结尾
+              <div class="text-xs text-gray-400 mt-1 space-y-1">
+                <div class="flex items-center gap-1">
+                  <NIcon size="14">
+                    <Information />
+                  </NIcon>
+                  请输入完整的 API 地址
+                </div>
+                <div class="ml-5 space-y-0.5">
+                  <div>• DeepSeek: https://api.deepseek.com/v1</div>
+                  <div>• 通义千问: https://dashscope.aliyuncs.com/compatible-mode/v1</div>
+                  <div>• OpenAI: https://api.openai.com/v1</div>
+                </div>
               </div>
             </template>
           </NFormItem>
